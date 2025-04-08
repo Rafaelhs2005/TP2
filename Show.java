@@ -90,7 +90,6 @@ public class Show {
         System.out.println("[" + showId + " ## " + type + " ## " + title + " ## " + String.join(", ", director) + " ## " + Arrays.toString(cast) + " ## " + country + " ## " + dateAdded + " ## " + releaseYear + " ## " + rating + " ## " + duration + " ## " + Arrays.toString(listedIn) + "]");
     }
 
-    // LER (a partir de uma linha CSV já dividida por vírgula)
     public void ler(String linha) {
         try {
             String[] campos = linha.split(",(?=([^\"]*\"[^\"]*\")*[^\"]*$)", -1); // Divide ignorando vírgulas entre aspas
