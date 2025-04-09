@@ -3,7 +3,7 @@ import java.util.*;
 
 public class main {
     public static void main(String[] args) throws Exception {
-        Scanner sc = new Scanner(new File("disneyplus.csv"));
+        Scanner sc = new Scanner(new File("/temp/disneyplus.csv"));
         String header = sc.nextLine(); // Pula o cabeçalho
 
         List<Show> shows = new ArrayList<>();
