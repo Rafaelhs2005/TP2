@@ -12,9 +12,12 @@ public class main {
             String linha = sc.nextLine();
             String[] campos = splitCSV(linha);
 
-            if (campos.length < 12) continue;
+            if (campos.length < 12) {
+                System.out.println("Linha ignorada (menos de 12 campos): " + Arrays.toString(campos));
+                continue;
+            }
 
-            // Usa os 12 primeiros campos, mesmo que a linha tenha mais
+            // Usa os 12 primeiros campos, ignorando os extras (ex: descrição)
             String[] camposValidos = Arrays.copyOfRange(campos, 0, 12);
 
             String showId = camposValidos[0];
@@ -35,11 +38,11 @@ public class main {
 
         sc.close();
 
-        System.out.println("Total de shows carregados: " + shows.size());
+        //System.out.println("Total de shows carregados: " + shows.size());
 
         Scanner in = new Scanner(System.in);
         while (true) {
-            System.out.print("Digite o ID do show para imprimir (ou FIM para sair): ");
+            //System.out.print("Digite o ID do show para imprimir (ou FIM para sair): ");
             String idBuscado = in.nextLine();
 
             if (idBuscado.equals("FIM")) {
