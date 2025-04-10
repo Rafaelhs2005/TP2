@@ -1,23 +1,19 @@
-import java.io.File;
+import java.io.*;
 import java.util.*;
 
 public class main {
     public static void main(String[] args) throws Exception {
-        Scanner sc = new Scanner(new File("/temp/disneyplus.csv"));
-        String header = sc.nextLine(); // Pula o cabeçalho
+        BufferedReader br = new BufferedReader(new FileReader("disneyplus.csv"));
+        String header = br.readLine(); // pula o cabeçalho
 
         List<Show> shows = new ArrayList<>();
+        String linha;
 
-        while (sc.hasNext()) {
-            String linha = sc.nextLine();
+        while ((linha = lerLinhaCompleta(br)) != null) {
             String[] campos = splitCSV(linha);
+            if (campos.length < 12) continue;
 
-            if (campos.length < 12) {
-                System.out.println("Linha ignorada (menos de 12 campos): " + Arrays.toString(campos));
-                continue;
-            }
-
-            // Usa os 12 primeiros campos, ignorando os extras (ex: descrição)
+            // Usa os 12 primeiros campos
             String[] camposValidos = Arrays.copyOfRange(campos, 0, 12);
 
             String showId = camposValidos[0];
@@ -36,18 +32,15 @@ public class main {
             shows.add(show);
         }
 
-        sc.close();
-
+        br.close();
         //System.out.println("Total de shows carregados: " + shows.size());
 
         Scanner in = new Scanner(System.in);
         while (true) {
-            //System.out.print("Digite o ID do show para imprimir (ou FIM para sair): ");
+            //stem.out.print("Digite o ID do show para imprimir (ou FIM para sair): ");
             String idBuscado = in.nextLine();
 
-            if (idBuscado.equals("FIM")) {
-                break;
-            }
+            if (idBuscado.equals("FIM")) break;
 
             boolean encontrado = false;
             for (Show s : shows) {
@@ -65,7 +58,32 @@ public class main {
         in.close();
     }
 
-    // Função que divide uma linha CSV com suporte a campos entre aspas
+    // Função que garante que uma linha esteja completa (número de aspas pares)
+    public static String lerLinhaCompleta(BufferedReader br) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        String linha;
+        int aspas = 0;
+
+        while ((linha = br.readLine()) != null) {
+            sb.append(linha);
+            aspas += contarAspas(linha);
+
+            if (aspas % 2 == 0) break; // linha completa
+            sb.append("\n"); // preserva a quebra de linha dentro de um campo
+        }
+
+        return sb.length() == 0 ? null : sb.toString();
+    }
+
+    public static int contarAspas(String linha) {
+        int count = 0;
+        for (char c : linha.toCharArray()) {
+            if (c == '"') count++;
+        }
+        return count;
+    }
+
+    // Mesmo splitCSV que você usava antes
     public static String[] splitCSV(String linha) {
         List<String> campos = new ArrayList<>();
         StringBuilder sb = new StringBuilder();

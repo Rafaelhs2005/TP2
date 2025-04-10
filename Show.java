@@ -83,10 +83,15 @@ public class Show {
     }
 
     public void imprimir() {
-        System.out.println("[" + showId + " ## " + type + " ## " + title + " ## " +
-            String.join(", ", director) + " ## " + Arrays.toString(cast) + " ## " + country +
-            " ## " + dateAdded + " ## " + releaseYear + " ## " + rating + " ## " +
-            duration + " ## " + Arrays.toString(listedIn) + "]");
+        System.out.print("=> " + showId + " ## " + title + " ## " + type + " ## ");
+        System.out.print((director.length > 0 ? String.join(", ", director) : "") + " ## ");
+        System.out.print(Arrays.toString(cast) + " ## ");
+        System.out.print(country + " ## ");
+        System.out.print(dateAdded + " ## ");
+        System.out.print(releaseYear + " ## ");
+        System.out.print(rating + " ## ");
+        System.out.print(duration + " ## ");
+        System.out.print(Arrays.toString(listedIn) + " ##\n");
     }
 
     public void ler(String linha) {
