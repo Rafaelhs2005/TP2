@@ -1,48 +1,152 @@
-import java.io.File;
-import java.util.Scanner;
+import java.io.*;
+import java.util.*;
 
 public class c1 {
+
     public static void main(String[] args) throws Exception {
-        final int NUM_CAMPOS = 12;
-        String[] campos = new String[NUM_CAMPOS];
-        Scanner sc = new Scanner(new File("./disneyplus.csv"));
+        BufferedReader br = new BufferedReader(new FileReader("/tmp/disneyplus.csv"));
+        String header = br.readLine(); // pula o cabeçalho
 
-        // Pula o cabeçalho
-        sc.nextLine();
+        List<Show> shows = new ArrayList<>();
+        String linha;
 
-        while (sc.hasNextLine()) {
-            String linha = sc.nextLine();
-            int campoIndex = 0;
-            StringBuilder campoAtual = new StringBuilder();
-            boolean dentroDeAspas = false;
+        while ((linha = lerLinhaCompleta(br)) != null) {
+            Show s = new Show();
+            s.ler(linha);
+            shows.add(s);
+        }
 
-            for (int i = 0; i < linha.length(); i++) {
-                char c = linha.charAt(i);
+        br.close();
 
-                if (c == '"') {
-                    dentroDeAspas = !dentroDeAspas; // alterna estado
-                } else if (c == ',' && !dentroDeAspas) {
-                    // fim de campo
-                    campos[campoIndex++] = campoAtual.toString().isEmpty() ? "NaN" : campoAtual.toString();
-                    campoAtual.setLength(0); // limpa StringBuilder
-                } else {
-                    campoAtual.append(c);
+        Scanner in = new Scanner(System.in);
+        while (true) {
+            String idBuscado = in.nextLine();
+
+            if (idBuscado.equals("FIM")) break;
+
+            boolean encontrado = false;
+            for (Show s : shows) {
+                if (s.getShowId().equals(idBuscado)) {
+                    s.imprimir();
+                    encontrado = true;
+                    break;
                 }
             }
 
-            // adiciona o último campo
-            if (campoIndex < NUM_CAMPOS) {
-                campos[campoIndex] = campoAtual.toString().isEmpty() ? "NaN" : campoAtual.toString();
+            if (!encontrado) {
+                System.out.println("Show com ID \"" + idBuscado + "\" não encontrado.");
             }
+        }
+        in.close();
+    }
 
-            // Exibe os dados extraídos
-            for (int i = 0; i < NUM_CAMPOS; i++) {
-                System.out.printf("Campo %02d: %s%n", i + 1, campos[i]);
-            }
+    public static String lerLinhaCompleta(BufferedReader br) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        String linha;
+        int aspas = 0;
 
-            System.out.println("=".repeat(60)); // separador entre linhas
+        while ((linha = br.readLine()) != null) {
+            sb.append(linha);
+            aspas += contarAspas(linha);
+
+            if (aspas % 2 == 0) break;
+            sb.append("\n");
         }
 
-        sc.close();
+        return sb.length() == 0 ? null : sb.toString();
+    }
+
+    public static int contarAspas(String linha) {
+        int count = 0;
+        for (char c : linha.toCharArray()) {
+            if (c == '"') count++;
+        }
+        return count;
+    }
+
+    public static String[] splitCSV(String linha) {
+        List<String> campos = new ArrayList<>();
+        StringBuilder sb = new StringBuilder();
+        boolean aspas = false;
+
+        for (int i = 0; i < linha.length(); i++) {
+            char c = linha.charAt(i);
+            if (c == '"') {
+                aspas = !aspas;
+            } else if (c == ',' && !aspas) {
+                campos.add(sb.length() == 0 ? "NaN" : sb.toString());
+                sb.setLength(0);
+            } else {
+                sb.append(c);
+            }
+        }
+
+        campos.add(sb.length() == 0 ? "NaN" : sb.toString());
+        return campos.toArray(new String[0]);
+    }
+}
+
+class Show {
+    private String showId;
+    private String type;
+    private String title;
+
+    public String getShowId() {
+        return showId;
+    }
+
+    private String[] director;
+    private String[] cast;
+    private String country;
+    private String dateAdded;
+    private int releaseYear;
+    private String rating;
+    private String duration;
+    private String[] listedIn;
+
+    public Show() {}
+
+    public void imprimir() {
+        System.out.print("=> " + showId + " ## " + title + " ## " + type + " ## ");
+        System.out.print((director.length > 0 ? String.join(", ", director) : "NaN") + " ## ");
+        System.out.print((cast.length > 0 ? Arrays.toString(cast) : "NaN") + " ## ");
+        System.out.print(country + " ## ");
+        System.out.print(dateAdded + " ## ");
+        System.out.print(releaseYear + " ## ");
+        System.out.print(rating + " ## ");
+        System.out.print(duration + " ## ");
+        System.out.print((listedIn.length > 0 ? Arrays.toString(listedIn) : "NaN") + " ##\n");
+    }
+
+    public void ler(String linha) {
+        try {
+            String[] campos = c1.splitCSV(linha);
+            if (campos.length < 11) throw new IllegalArgumentException("Linha com campos insuficientes");
+
+            this.showId = campos[0].isEmpty() ? "NaN" : campos[0].trim();
+            this.type = campos[1].isEmpty() ? "NaN" : campos[1].trim();
+            this.title = campos[2].isEmpty() ? "NaN" : campos[2].trim();
+
+            this.director = campos[3].equals("NaN") ? new String[0] : campos[3].split(",\\s*");
+            Arrays.sort(this.director);
+
+            this.cast = campos[4].equals("NaN") ? new String[0] : campos[4].split(",\\s*");
+            Arrays.sort(this.cast);
+
+            this.country = campos[5].equals("NaN") || campos[5].isEmpty() ? "NaN" : campos[5].trim();
+
+            this.dateAdded = campos[6].equals("NaN") || campos[6].isEmpty() ? "March 1, 1900" : campos[6].trim();
+
+            this.releaseYear = campos[7].equals("NaN") || campos[7].isEmpty() ? 0 : Integer.parseInt(campos[7]);
+
+            this.rating = campos[8].equals("NaN") || campos[8].isEmpty() ? "NaN" : campos[8].trim();
+            this.duration = campos[9].equals("NaN") || campos[9].isEmpty() ? "NaN" : campos[9].trim();
+
+            this.listedIn = campos[10].equals("NaN") ? new String[0] : campos[10].split(",\\s*");
+            Arrays.sort(this.listedIn);
+
+        } catch (Exception e) {
+            System.out.println("Erro ao ler linha: " + e.getMessage());
+        }
     }
 }

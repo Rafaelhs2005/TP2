@@ -3,7 +3,7 @@ import java.util.*;
 
 public class main {
     public static void main(String[] args) throws Exception {
-        BufferedReader br = new BufferedReader(new FileReader("disneyplus.csv"));
+        BufferedReader br = new BufferedReader(new FileReader("/temp/disneyplus.csv"));
         String header = br.readLine(); // pula o cabeçalho
 
         List<Show> shows = new ArrayList<>();
@@ -35,27 +35,6 @@ public class main {
         br.close();
         //System.out.println("Total de shows carregados: " + shows.size());
 
-        Scanner in = new Scanner(System.in);
-        while (true) {
-            //stem.out.print("Digite o ID do show para imprimir (ou FIM para sair): ");
-            String idBuscado = in.nextLine();
-
-            if (idBuscado.equals("FIM")) break;
-
-            boolean encontrado = false;
-            for (Show s : shows) {
-                if (s.getShowId().equals(idBuscado)) {
-                    s.imprimir();
-                    encontrado = true;
-                    break;
-                }
-            }
-
-            if (!encontrado) {
-                System.out.println("Show com ID \"" + idBuscado + "\" não encontrado.");
-            }
-        }
-        in.close();
     }
 
     // Função que garante que uma linha esteja completa (número de aspas pares)
