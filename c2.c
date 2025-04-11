@@ -2,151 +2,255 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <ctype.h>
 
-#define MAX_SHOWS 10000
-#define MAX_LINE 1000
-#define MAX_FIELD 200
+#define MAX_LINE_LENGTH 1024
+#define MAX_FIELDS 20
+#define MAX_ARRAY_SIZE 50
+#define MAX_ID_LENGTH 20
 
 typedef struct {
-    char showId[MAX_FIELD];
-    char type[MAX_FIELD];
-    char title[MAX_FIELD];
-    char director[10][MAX_FIELD];
+    char* showId;
+    char* type;
+    char* title;
+    char** director;
     int directorCount;
-    char cast[20][MAX_FIELD];
+    char** cast;
     int castCount;
-    char country[MAX_FIELD];
-    char dateAdded[MAX_FIELD];
+    char* country;
+    char* dateAdded;
     int releaseYear;
-    char rating[MAX_FIELD];
-    char duration[MAX_FIELD];
-    char listedIn[10][MAX_FIELD];
-    int listedCount;
+    char* rating;
+    char* duration;
+    char** listedIn;
+    int listedInCount;
 } Show;
 
-int contarAspas(const char* linha) {
+// Função de comparação para qsort
+int compareStrings(const void* a, const void* b) {
+    return strcmp(*(const char**)a, *(const char**)b);
+}
+
+// Função para ordenar um array de strings
+void sortStringArray(char** array, int count) {
+    if (array != NULL && count > 1) {
+        qsort(array, count, sizeof(char*), compareStrings);
+    }
+}
+
+int countQuotes(const char* line) {
     int count = 0;
-    for (int i = 0; linha[i]; i++)
-        if (linha[i] == '"') count++;
+    while (*line) {
+        if (*line == '"') count++;
+        line++;
+    }
     return count;
 }
 
-char* lerLinhaCompleta(FILE* fp, char* buffer) {
-    char temp[MAX_LINE];
-    buffer[0] = '\0';
-    int aspas = 0;
-
-    while (fgets(temp, MAX_LINE, fp)) {
-        strcat(buffer, temp);
-        aspas += contarAspas(temp);
-        if (aspas % 2 == 0) break;
-    }
-
-    return strlen(buffer) == 0 ? NULL : buffer;
-}
-
-int splitCSV(const char* linha, char campos[][MAX_FIELD]) {
-    int campoIndex = 0, i = 0, j = 0;
-    bool aspas = false;
-    char buffer[MAX_FIELD] = "";
-
-    while (linha[i]) {
-        if (linha[i] == '"') {
-            aspas = !aspas;
-        } else if (linha[i] == ',' && !aspas) {
-            buffer[j] = '\0';
-            strcpy(campos[campoIndex++], j == 0 ? "NaN" : buffer);
-            j = 0;
-        } else {
-            buffer[j++] = linha[i];
+char* readCompleteLine(FILE* file) {
+    char buffer[MAX_LINE_LENGTH];
+    char* line = NULL;
+    size_t totalLength = 0;
+    int quotes = 0;
+    
+    do {
+        if (fgets(buffer, MAX_LINE_LENGTH, file) == NULL) {
+            break;
         }
-        i++;
+        
+        quotes += countQuotes(buffer);
+        
+        size_t bufferLength = strlen(buffer);
+        char* newLine = realloc(line, totalLength + bufferLength + 1);
+        if (newLine == NULL) {
+            free(line);
+            return NULL;
+        }
+        
+        line = newLine;
+        strcpy(line + totalLength, buffer);
+        totalLength += bufferLength;
+        
+    } while (quotes % 2 != 0);
+    
+    if (totalLength > 0 && line[totalLength - 1] == '\n') {
+        line[totalLength - 1] = '\0';
     }
-
-    buffer[j] = '\0';
-    strcpy(campos[campoIndex++], j == 0 ? "NaN" : buffer);
-
-    return campoIndex;
+    
+    return line;
 }
 
 void trim(char* str) {
-    int len = strlen(str);
-    while (len > 0 && (str[len-1] == '\n' || str[len-1] == '\r'))
-        str[--len] = '\0';
-}
-
-void parseArray(char* campo, char arr[][MAX_FIELD], int* count) {
-    *count = 0;
-    if (strcmp(campo, "NaN") == 0) return;
-
-    char* token = strtok(campo, ",");
-    while (token != NULL && *count < 20) {
-        while (*token == ' ') token++;
-        strcpy(arr[(*count)++], token);
-        token = strtok(NULL, ",");
+    int i = 0, j = 0;
+    while (isspace((unsigned char)str[i])) i++;
+    
+    while (str[i]) {
+        str[j++] = str[i++];
+    }
+    str[j] = '\0';
+    
+    while (j > 0 && isspace((unsigned char)str[j - 1])) {
+        str[--j] = '\0';
     }
 }
 
-void lerShow(Show* s, const char* linha) {
-    char campos[11][MAX_FIELD];
-    char linhaCopia[MAX_LINE];
-    strcpy(linhaCopia, linha);
+void splitCSV(const char* line, char** fields, int* fieldCount) {
+    bool inQuotes = false;
+    char* field = malloc(MAX_LINE_LENGTH);
+    int fieldPos = 0;
+    *fieldCount = 0;
+    
+    for (int i = 0; line[i] != '\0'; i++) {
+        if (line[i] == '"') {
+            inQuotes = !inQuotes;
+        } else if (line[i] == ',' && !inQuotes) {
+            field[fieldPos] = '\0';
+            trim(field);
+            fields[*fieldCount] = strcmp(field, "") == 0 ? strdup("NaN") : strdup(field);
+            (*fieldCount)++;
+            fieldPos = 0;
+            free(field);
+            field = malloc(MAX_LINE_LENGTH);
+        } else {
+            field[fieldPos++] = line[i];
+        }
+    }
+    
+    field[fieldPos] = '\0';
+    trim(field);
+    fields[*fieldCount] = strcmp(field, "") == 0 ? strdup("NaN") : strdup(field);
+    (*fieldCount)++;
+    free(field);
+}
 
-    int qtd = splitCSV(linhaCopia, campos);
-    if (qtd < 11) {
-        printf("Erro: Linha com campos insuficientes\n");
+void splitArray(char* str, char*** array, int* count) {
+    if (strcmp(str, "NaN") == 0) {
+        *array = NULL;
+        *count = 0;
         return;
     }
-
-    strcpy(s->showId, campos[0]);
-    strcpy(s->type, campos[1]);
-    strcpy(s->title, campos[2]);
-
-    parseArray(campos[3], s->director, &s->directorCount);
-    parseArray(campos[4], s->cast, &s->castCount);
-
-    strcpy(s->country, strcmp(campos[5], "NaN") == 0 ? "NaN" : campos[5]);
-    strcpy(s->dateAdded, strcmp(campos[6], "NaN") == 0 ? "March 1, 1900" : campos[6]);
-
-    s->releaseYear = strcmp(campos[7], "NaN") == 0 ? 0 : atoi(campos[7]);
-    strcpy(s->rating, campos[8]);
-    strcpy(s->duration, campos[9]);
-
-    parseArray(campos[10], s->listedIn, &s->listedCount);
+    
+    char** tempArray = malloc(MAX_ARRAY_SIZE * sizeof(char*));
+    char* token = strtok(str, ",");
+    *count = 0;
+    
+    while (token != NULL && *count < MAX_ARRAY_SIZE) {
+        trim(token);
+        tempArray[*count] = strdup(token);
+        (*count)++;
+        token = strtok(NULL, ",");
+    }
+    
+    *array = malloc(*count * sizeof(char*));
+    for (int i = 0; i < *count; i++) {
+        (*array)[i] = tempArray[i];
+    }
+    free(tempArray);
+    
+    // Ordena o array após a criação
+    sortStringArray(*array, *count);
 }
 
-void imprimirShow(const Show* s) {
-    printf("=> %s ## %s ## %s ## ", s->showId, s->title, s->type);
+void freeShow(Show* show) {
+    free(show->showId);
+    free(show->type);
+    free(show->title);
+    
+    for (int i = 0; i < show->directorCount; i++) {
+        free(show->director[i]);
+    }
+    free(show->director);
+    
+    for (int i = 0; i < show->castCount; i++) {
+        free(show->cast[i]);
+    }
+    free(show->cast);
+    
+    free(show->country);
+    free(show->dateAdded);
+    free(show->rating);
+    free(show->duration);
+    
+    for (int i = 0; i < show->listedInCount; i++) {
+        free(show->listedIn[i]);
+    }
+    free(show->listedIn);
+}
 
-    if (s->directorCount > 0) {
-        for (int i = 0; i < s->directorCount; i++) {
-            printf("%s", s->director[i]);
-            if (i < s->directorCount - 1) printf(", ");
+void readShow(Show* show, const char* line) {
+    char* fields[MAX_FIELDS];
+    int fieldCount;
+    
+    splitCSV(line, fields, &fieldCount);
+    
+    if (fieldCount < 11) {
+        printf("Linha com campos insuficientes\n");
+        return;
+    }
+    
+    show->showId = strdup(fields[0]);
+    show->type = strdup(fields[1]);
+    show->title = strdup(fields[2]);
+    
+    splitArray(fields[3], &show->director, &show->directorCount);
+    splitArray(fields[4], &show->cast, &show->castCount);
+    
+    show->country = strcmp(fields[5], "NaN") == 0 ? strdup("NaN") : strdup(fields[5]);
+    
+    if (strcmp(fields[6], "NaN") == 0 || strcmp(fields[6], "") == 0) {
+        show->dateAdded = strdup("March 1, 1900");
+    } else {
+        show->dateAdded = strdup(fields[6]);
+    }
+    
+    show->releaseYear = strcmp(fields[7], "NaN") == 0 || strcmp(fields[7], "") == 0 ? 
+        0 : atoi(fields[7]);
+    
+    show->rating = strcmp(fields[8], "NaN") == 0 || strcmp(fields[8], "") == 0 ? 
+        strdup("NaN") : strdup(fields[8]);
+    
+    show->duration = strcmp(fields[9], "NaN") == 0 || strcmp(fields[9], "") == 0 ? 
+        strdup("NaN") : strdup(fields[9]);
+    
+    splitArray(fields[10], &show->listedIn, &show->listedInCount);
+    
+    for (int i = 0; i < fieldCount; i++) {
+        free(fields[i]);
+    }
+}
+
+void printShow(const Show* show) {
+    printf("=> %s ## %s ## %s ## ", show->showId, show->title, show->type);
+    
+    if (show->directorCount > 0) {
+        for (int i = 0; i < show->directorCount; i++) {
+            printf("%s%s", show->director[i], i < show->directorCount - 1 ? ", " : "");
         }
     } else {
         printf("NaN");
     }
     printf(" ## ");
-
-    if (s->castCount > 0) {
-        printf("[");
-        for (int i = 0; i < s->castCount; i++) {
-            printf("%s", s->cast[i]);
-            if (i < s->castCount - 1) printf(", ");
+    
+    // Campo do elenco (cast) sempre entre colchetes
+    printf("[");
+    if (show->castCount > 0) {
+        for (int i = 0; i < show->castCount; i++) {
+            printf("%s%s", show->cast[i], i < show->castCount - 1 ? ", " : "");
         }
-        printf("]");
     } else {
         printf("NaN");
     }
+    printf("]");
     printf(" ## ");
-
-    printf("%s ## %s ## %d ## %s ## %s ## ", s->country, s->dateAdded, s->releaseYear, s->rating, s->duration);
-
-    if (s->listedCount > 0) {
+    
+    printf("%s ## %s ## %d ## %s ## %s ## ", 
+           show->country, show->dateAdded, show->releaseYear, 
+           show->rating, show->duration);
+    
+    if (show->listedInCount > 0) {
         printf("[");
-        for (int i = 0; i < s->listedCount; i++) {
-            printf("%s", s->listedIn[i]);
-            if (i < s->listedCount - 1) printf(", ");
+        for (int i = 0; i < show->listedInCount; i++) {
+            printf("%s%s", show->listedIn[i], i < show->listedInCount - 1 ? ", " : "");
         }
         printf("]");
     } else {
@@ -156,42 +260,68 @@ void imprimirShow(const Show* s) {
 }
 
 int main() {
-    FILE* fp = fopen("/tmp/disneyplus.csv", "r");
-    if (!fp) {
-        printf("Erro ao abrir o arquivo.\n");
+    FILE* file = fopen("/tmp/disneyplus.csv", "r");
+    if (file == NULL) {
+        perror("Erro ao abrir o arquivo");
         return 1;
     }
-
-    char linha[MAX_LINE];
-    fgets(linha, MAX_LINE, fp); // Pula cabeçalho
-
-    Show shows[MAX_SHOWS];
-    int count = 0;
-
-    while (lerLinhaCompleta(fp, linha) != NULL && count < MAX_SHOWS) {
-        lerShow(&shows[count++], linha);
+    
+    // Pular cabeçalho
+    char header[MAX_LINE_LENGTH];
+    if (fgets(header, MAX_LINE_LENGTH, file) == NULL) {
+        fclose(file);
+        printf("Arquivo vazio\n");
+        return 1;
     }
-    fclose(fp);
-
-    char input[MAX_FIELD];
-    while (true) {
-        fgets(input, MAX_FIELD, stdin);
-        trim(input);
-        if (strcmp(input, "FIM") == 0) break;
-
+    
+    Show* shows = NULL;
+    int showCount = 0;
+    char* line;
+    
+    while ((line = readCompleteLine(file)) != NULL) {
+        Show show;
+        readShow(&show, line);
+        free(line);
+        
+        shows = realloc(shows, (showCount + 1) * sizeof(Show));
+        shows[showCount] = show;
+        showCount++;
+    }
+    
+    fclose(file);
+    
+    // Função de busca por ID
+    char idBuscado[MAX_ID_LENGTH];
+    while (1) {
+        if (fgets(idBuscado, MAX_ID_LENGTH, stdin) == NULL) {
+            break;
+        }
+        
+        idBuscado[strcspn(idBuscado, "\n")] = '\0';
+        
+        if (strcmp(idBuscado, "FIM") == 0) {
+            break;
+        }
+        
         bool encontrado = false;
-        for (int i = 0; i < count; i++) {
-            if (strcmp(shows[i].showId, input) == 0) {
-                imprimirShow(&shows[i]);
+        for (int i = 0; i < showCount; i++) {
+            if (strcmp(shows[i].showId, idBuscado) == 0) {
+                printShow(&shows[i]);
                 encontrado = true;
                 break;
             }
         }
-
+        
         if (!encontrado) {
-            printf("Show com ID \"%s\" não encontrado.\n", input);
+            printf("Show com ID \"%s\" não encontrado.\n", idBuscado);
         }
     }
-
+    
+    // Liberar memória
+    for (int i = 0; i < showCount; i++) {
+        freeShow(&shows[i]);
+    }
+    free(shows);
+    
     return 0;
 }

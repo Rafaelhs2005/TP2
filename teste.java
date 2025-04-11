@@ -1,7 +1,7 @@
 import java.io.*;
 import java.util.*;
 
-public class c1 {
+public class teste {
 
     public static void main(String[] args) throws Exception {
         BufferedReader br = new BufferedReader(new FileReader("disneyplus.csv"));
@@ -17,27 +17,6 @@ public class c1 {
         }
 
         br.close();
-
-        Scanner in = new Scanner(System.in);
-        while (true) {
-            String idBuscado = in.nextLine();
-
-            if (idBuscado.equals("FIM")) break;
-
-            boolean encontrado = false;
-            for (Show s : shows) {
-                if (s.getShowId().equals(idBuscado)) {
-                    s.imprimir();
-                    encontrado = true;
-                    break;
-                }
-            }
-
-            if (!encontrado) {
-                System.out.println("Show com ID \"" + idBuscado + "\" não encontrado.");
-            }
-        }
-        in.close();
     }
 
     public static String lerLinhaCompleta(BufferedReader br) throws IOException {
