@@ -97,7 +97,6 @@ void separarLista(char *campo, char destino[MAX_ITEMS][MAX_STR], int *count) {
         token = strtok(NULL, ",");
     }
 
-    // Ordenar
     char *ordenar[MAX_ITEMS];
     for (int i = 0; i < *count; i++) ordenar[i] = destino[i];
     qsort(ordenar, *count, sizeof(char*), compararStrings);
@@ -137,7 +136,7 @@ void imprimirShow(const Show *s) {
 }
 
 int main() {
-    FILE *fp = fopen("disneyplus.csv", "r");
+    FILE *fp = fopen("/tmp/disneyplus.csv", "r");
     if (!fp) {
         perror("Erro ao abrir o arquivo");
         return 1;
@@ -148,7 +147,7 @@ int main() {
     Show shows[10000];
     int totalShows = 0;
 
-    fgets(linhaCompleta, MAX_LINE, fp); // Pula cabeçalho
+    fgets(linhaCompleta, MAX_LINE, fp);
     while (lerLinhaCompleta(fp, linhaCompleta)) {
         splitCSV(linhaCompleta, campos);
         lerShow(&shows[totalShows++], campos);
@@ -156,9 +155,8 @@ int main() {
     fclose(fp);
 
     char entrada[MAX_STR];
-    while (true) {
-        fgets(entrada, MAX_STR, stdin);
-        entrada[strcspn(entrada, "\n")] = 0;
+    printf("Digite um ID de show (ou FIM para sair):\n");
+    while (scanf("%255s", entrada) == 1) {
         if (strcmp(entrada, "FIM") == 0) break;
 
         bool encontrado = false;
@@ -172,6 +170,7 @@ int main() {
         if (!encontrado) {
             printf("Show com ID \"%s\" nao encontrado.\n", entrada);
         }
+        printf("\nDigite outro ID de show (ou FIM para sair):\n");
     }
 
     return 0;
