@@ -1,7 +1,7 @@
 import java.io.*;
 import java.util.*;
 
-public class c3 {
+public class c5 {
     public static void main(String[] args) throws Exception {
         BufferedReader br = new BufferedReader(new FileReader("/tmp/disneyplus.csv"));
         String header = br.readLine(); // pula o cabeçalho
@@ -20,6 +20,7 @@ public class c3 {
         Scanner in = new Scanner(System.in);
         List<Show> selecionados = new ArrayList<>();
 
+        // Entrada de IDs
         while (true) {
             String idBuscado = in.nextLine();
             if (idBuscado.equals("FIM")) break;
@@ -38,13 +39,17 @@ public class c3 {
             }
         }
 
-        // Entrada de títulos
+        // Converte lista para vetor e ordena por selection sort usando o título
+        Show[] vetor = selecionados.toArray(new Show[0]);
+        selectionSortPorTitulo(vetor);
+
+        // Entrada de títulos e busca sequencial no vetor ordenado
         while (true) {
             String tituloBuscado = in.nextLine();
             if (tituloBuscado.equals("FIM")) break;
 
             boolean achou = false;
-            for (Show s : selecionados) {
+            for (Show s : vetor) {
                 if (s.getTitle().equalsIgnoreCase(tituloBuscado)) {
                     achou = true;
                     break;
@@ -55,6 +60,23 @@ public class c3 {
         }
 
         in.close();
+    }
+
+    // Ordenação por seleção usando o título como chave
+    public static void selectionSortPorTitulo(Show[] vetor) {
+        for (int i = 0; i < vetor.length - 1; i++) {
+            int menor = i;
+            for (int j = i + 1; j < vetor.length; j++) {
+                if (vetor[j].getTitle().compareToIgnoreCase(vetor[menor].getTitle()) < 0) {
+                    menor = j;
+                }
+            }
+            if (menor != i) {
+                Show temp = vetor[i];
+                vetor[i] = vetor[menor];
+                vetor[menor] = temp;
+            }
+        }
     }
 
     public static String lerLinhaCompleta(BufferedReader br) throws IOException {
@@ -140,7 +162,7 @@ class Show {
 
     public void ler(String linha) {
         try {
-            String[] campos = c3.splitCSV(linha);
+            String[] campos = c5.splitCSV(linha);
             if (campos.length < 11) throw new IllegalArgumentException("Linha com campos insuficientes");
 
             this.showId = campos[0].isEmpty() ? "NaN" : campos[0].trim();
