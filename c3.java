@@ -1,9 +1,5 @@
-import java.io.*;
-import java.util.*;
-
-public class teste {
-
-    public static void main(String[] args) throws Exception {
+public class c3 {
+    public static void main(String[] args) {
         BufferedReader br = new BufferedReader(new FileReader("disneyplus.csv"));
         String header = br.readLine(); // pula o cabeçalho
 
@@ -17,51 +13,27 @@ public class teste {
         }
 
         br.close();
-    }
 
-    public static String lerLinhaCompleta(BufferedReader br) throws IOException {
-        StringBuilder sb = new StringBuilder();
-        String linha;
-        int aspas = 0;
+        Scanner in = new Scanner(System.in);
+        while (true) {
+            String idBuscado = in.nextLine();
 
-        while ((linha = br.readLine()) != null) {
-            sb.append(linha);
-            aspas += contarAspas(linha);
+            if (idBuscado.equals("FIM")) break;
 
-            if (aspas % 2 == 0) break;
-            sb.append("\n");
-        }
+            boolean encontrado = false;
+            for (Show s : shows) {
+                if (s.getShowId().equals(idBuscado)) {
+                    s.imprimir();
+                    encontrado = true;
+                    break;
+                }
+            }
 
-        return sb.length() == 0 ? null : sb.toString();
-    }
-
-    public static int contarAspas(String linha) {
-        int count = 0;
-        for (char c : linha.toCharArray()) {
-            if (c == '"') count++;
-        }
-        return count;
-    }
-
-    public static String[] splitCSV(String linha) {
-        List<String> campos = new ArrayList<>();
-        StringBuilder sb = new StringBuilder();
-        boolean aspas = false;
-
-        for (int i = 0; i < linha.length(); i++) {
-            char c = linha.charAt(i);
-            if (c == '"') {
-                aspas = !aspas;
-            } else if (c == ',' && !aspas) {
-                campos.add(sb.length() == 0 ? "NaN" : sb.toString());
-                sb.setLength(0);
-            } else {
-                sb.append(c);
+            if (!encontrado) {
+                System.out.println("Show com ID \"" + idBuscado + "\" não encontrado.");
             }
         }
-
-        campos.add(sb.length() == 0 ? "NaN" : sb.toString());
-        return campos.toArray(new String[0]);
+        in.close();
     }
 }
 
