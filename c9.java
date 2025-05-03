@@ -1,7 +1,7 @@
 import java.io.*;
 import java.util.*;
 
-public class c5 {
+public class c9 {
     public static void main(String[] args) throws Exception {
         BufferedReader br = new BufferedReader(new FileReader("/tmp/disneyplus.csv"));
         String header = br.readLine(); // pula o cabeçalho
@@ -20,64 +20,86 @@ public class c5 {
         Scanner in = new Scanner(System.in);
         List<Show> selecionados = new ArrayList<>();
 
-        // Entrada de IDs
         while (true) {
             String idBuscado = in.nextLine();
             if (idBuscado.equals("FIM")) break;
 
-            boolean encontrado = false;
             for (Show s : shows) {
                 if (s.getShowId().equals(idBuscado)) {
                     selecionados.add(s);
-                    encontrado = true;
                     break;
                 }
             }
-
-            if (!encontrado) {
-                System.out.println("Show com ID \"" + idBuscado + "\" não encontrado.");
-            }
         }
 
-        // Converte lista para vetor e mede tempo + comparações da ordenação
         Show[] vetor = selecionados.toArray(new Show[0]);
+
         long inicio = System.currentTimeMillis();
-        int comparacoes = selectionSortPorTitulo(vetor);
+        int comparacoes = heapSortPorDirector(vetor);
         long fim = System.currentTimeMillis();
         long tempoExecucao = fim - inicio;
 
-        // Imprime vetor ordenado
         for (Show s : vetor) {
             s.imprimir();
         }
 
-        // Escreve arquivo de log
-        try (PrintWriter writer = new PrintWriter(new FileWriter("866308_sequencial.txt"))) {
+        try (PrintWriter writer = new PrintWriter("866308_heapsort.txt")) {
             writer.println("866308\t" + tempoExecucao + "\t" + comparacoes);
-        } catch (IOException e) {
-            System.out.println("Erro ao escrever no arquivo de log: " + e.getMessage());
         }
 
         in.close();
     }
 
-    public static int selectionSortPorTitulo(Show[] vetor) {
+    public static int heapSortPorDirector(Show[] arr) {
+        int n = arr.length;
         int comparacoes = 0;
-        for (int i = 0; i < vetor.length - 1; i++) {
-            int menor = i;
-            for (int j = i + 1; j < vetor.length; j++) {
-                comparacoes++;
-                if (vetor[j].getTitle().compareToIgnoreCase(vetor[menor].getTitle()) < 0) {
-                    menor = j;
-                }
-            }
-            if (menor != i) {
-                Show temp = vetor[i];
-                vetor[i] = vetor[menor];
-                vetor[menor] = temp;
-            }
+
+        for (int i = n / 2 - 1; i >= 0; i--) {
+            comparacoes += heapify(arr, n, i);
         }
+
+        for (int i = n - 1; i > 0; i--) {
+            Show temp = arr[0];
+            arr[0] = arr[i];
+            arr[i] = temp;
+            comparacoes += heapify(arr, i, 0);
+        }
+
         return comparacoes;
+    }
+
+    public static int heapify(Show[] arr, int n, int i) {
+        int comparacoes = 0;
+        int maior = i;
+        int esq = 2 * i + 1;
+        int dir = 2 * i + 2;
+
+        if (esq < n && comparar(arr[esq], arr[maior]) > 0) {
+            maior = esq;
+        }
+        comparacoes++;
+
+        if (dir < n && comparar(arr[dir], arr[maior]) > 0) {
+            maior = dir;
+        }
+        comparacoes++;
+
+        if (maior != i) {
+            Show swap = arr[i];
+            arr[i] = arr[maior];
+            arr[maior] = swap;
+            comparacoes += heapify(arr, n, maior);
+        }
+
+        return comparacoes;
+    }
+
+    public static int comparar(Show a, Show b) {
+        String d1 = a.getDirector();
+        String d2 = b.getDirector();
+        int cmp = d1.compareToIgnoreCase(d2);
+        if (cmp != 0) return cmp;
+        return a.getTitle().compareToIgnoreCase(b.getTitle());
     }
 
     public static String lerLinhaCompleta(BufferedReader br) throws IOException {
@@ -138,6 +160,10 @@ class Show {
         return title;
     }
 
+    public String getType() {
+        return type;
+    }
+
     private String[] director;
     private String[] cast;
     private String country;
@@ -163,7 +189,7 @@ class Show {
 
     public void ler(String linha) {
         try {
-            String[] campos = c5.splitCSV(linha);
+            String[] campos = c9.splitCSV(linha);
             if (campos.length < 11) throw new IllegalArgumentException("Linha com campos insuficientes");
 
             this.showId = campos[0].isEmpty() ? "NaN" : campos[0].trim();
@@ -186,5 +212,9 @@ class Show {
         } catch (Exception e) {
             System.out.println("Erro ao ler linha: " + e.getMessage());
         }
+    }
+
+    public String getDirector() {
+        return director.length > 0 ? director[0] : "NaN";
     }
 }

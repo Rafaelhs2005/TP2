@@ -1,7 +1,7 @@
 import java.io.*;
 import java.util.*;
 
-public class c5 {
+public class c7 {
     public static void main(String[] args) throws Exception {
         BufferedReader br = new BufferedReader(new FileReader("/tmp/disneyplus.csv"));
         String header = br.readLine(); // pula o cabeçalho
@@ -39,10 +39,11 @@ public class c5 {
             }
         }
 
-        // Converte lista para vetor e mede tempo + comparações da ordenação
+        // Converte lista para vetor
         Show[] vetor = selecionados.toArray(new Show[0]);
+
         long inicio = System.currentTimeMillis();
-        int comparacoes = selectionSortPorTitulo(vetor);
+        int comparacoes = insertionSortPorTypeComDesempate(vetor);
         long fim = System.currentTimeMillis();
         long tempoExecucao = fim - inicio;
 
@@ -51,8 +52,8 @@ public class c5 {
             s.imprimir();
         }
 
-        // Escreve arquivo de log
-        try (PrintWriter writer = new PrintWriter(new FileWriter("866308_sequencial.txt"))) {
+        // Escreve log
+        try (PrintWriter writer = new PrintWriter(new FileWriter("866308_insercao.txt"))) {
             writer.println("866308\t" + tempoExecucao + "\t" + comparacoes);
         } catch (IOException e) {
             System.out.println("Erro ao escrever no arquivo de log: " + e.getMessage());
@@ -61,21 +62,22 @@ public class c5 {
         in.close();
     }
 
-    public static int selectionSortPorTitulo(Show[] vetor) {
+    public static int insertionSortPorTypeComDesempate(Show[] vetor) {
         int comparacoes = 0;
-        for (int i = 0; i < vetor.length - 1; i++) {
-            int menor = i;
-            for (int j = i + 1; j < vetor.length; j++) {
+        for (int i = 1; i < vetor.length; i++) {
+            Show tmp = vetor[i];
+            int j = i - 1;
+            while (j >= 0) {
                 comparacoes++;
-                if (vetor[j].getTitle().compareToIgnoreCase(vetor[menor].getTitle()) < 0) {
-                    menor = j;
+                int cmp = vetor[j].getType().compareToIgnoreCase(tmp.getType());
+                if (cmp > 0 || (cmp == 0 && vetor[j].getTitle().compareToIgnoreCase(tmp.getTitle()) > 0)) {
+                    vetor[j + 1] = vetor[j];
+                    j--;
+                } else {
+                    break;
                 }
             }
-            if (menor != i) {
-                Show temp = vetor[i];
-                vetor[i] = vetor[menor];
-                vetor[menor] = temp;
-            }
+            vetor[j + 1] = tmp;
         }
         return comparacoes;
     }
@@ -138,6 +140,10 @@ class Show {
         return title;
     }
 
+    public String getType() {
+        return type;
+    }
+
     private String[] director;
     private String[] cast;
     private String country;
@@ -163,7 +169,7 @@ class Show {
 
     public void ler(String linha) {
         try {
-            String[] campos = c5.splitCSV(linha);
+            String[] campos = c7.splitCSV(linha);
             if (campos.length < 11) throw new IllegalArgumentException("Linha com campos insuficientes");
 
             this.showId = campos[0].isEmpty() ? "NaN" : campos[0].trim();
