@@ -142,9 +142,7 @@ void readShow(Show *show, const char *line) {
   char *fields[MAX_FIELDS];
   int fieldCount;
   splitCSV(line, fields, &fieldCount);
-
   if (fieldCount < 11) return;
-
   show->showId = strdup(fields[0]);
   show->type = strdup(fields[1]);
   show->title = strdup(fields[2]);
@@ -156,7 +154,6 @@ void readShow(Show *show, const char *line) {
   show->rating = strdup(fields[8]);
   show->duration = strdup(fields[9]);
   splitArray(fields[10], &show->listedIn, &show->listedInCount);
-
   for (int i = 0; i < fieldCount; i++) free(fields[i]);
 }
 
@@ -184,64 +181,67 @@ void printShow(const Show *show) {
   printf(" ##\n");
 }
 
-// ========== RADIX SORT COM DESEMPATE POR TITLE ==========
+// === Heapsort parcial k=10 com desempate por title ===
 
-
-//O Radix Sort é um algoritmo de ordenação não-comparativo que ordena os números dígito a dígito, começando pelo menos significativo até o mais significativo (LSB para MSB). É eficiente para ordenar inteiros ou strings com tamanho fixo.
-//Complexidade de tempo: O(nk), onde n é o número de elementos e k é o número de dígitos do maior número. Complexidade de espaço: O(n + k).
-
-
-int getMaxReleaseYear(Show *arr, int n) {
-  int max = arr[0].releaseYear;
-  for (int i = 1; i < n; i++)
-    if (arr[i].releaseYear > max) max = arr[i].releaseYear;
-  return max;
+int compareShows(const Show *a, const Show *b) {
+  if (a->releaseYear != b->releaseYear)
+    return a->releaseYear - b->releaseYear;
+  return strcmp(a->title, b->title);
 }
 
-void countingSortByDigit(Show *arr, int n, int exp, int *comparisons) {
-  Show *output = malloc(n * sizeof(Show));
-  int count[10] = {0};
+void swap(Show *a, Show *b) {
+  Show temp = *a;
+  *a = *b;
+  *b = temp;
+}
 
-  for (int i = 0; i < n; i++)
-    count[(arr[i].releaseYear / exp) % 10]++;
+void heapify(Show *arr, int n, int i) {
+  int smallest = i;
+  int l = 2 * i + 1;
+  int r = 2 * i + 2;
 
-  for (int i = 1; i < 10; i++)
-    count[i] += count[i - 1];
+  if (l < n && compareShows(&arr[l], &arr[smallest]) < 0)
+    smallest = l;
+  if (r < n && compareShows(&arr[r], &arr[smallest]) < 0)
+    smallest = r;
 
-  for (int i = n - 1; i >= 0; i--) {
-    int idx = (arr[i].releaseYear / exp) % 10;
-    output[--count[idx]] = arr[i];
+  if (smallest != i) {
+    swap(&arr[i], &arr[smallest]);
+    heapify(arr, n, smallest);
   }
+}
 
-  // Desempate por título entre elementos com mesmo releaseYear
-  int i = 0;
-  while (i < n) {
-    int j = i + 1;
-    while (j < n && output[j].releaseYear == output[i].releaseYear) j++;
+void buildMinHeap(Show *arr, int n) {
+  for (int i = n / 2 - 1; i >= 0; i--)
+    heapify(arr, n, i);
+}
 
-    for (int a = i; a < j - 1; a++) {
-      for (int b = i; b < j - 1 - (a - i); b++) {
-        (*comparisons)++;
-        if (strcmp(output[b].title, output[b + 1].title) > 0) {
-          Show tmp = output[b];
-          output[b] = output[b + 1];
-          output[b + 1] = tmp;
-        }
-      }
+void partialHeapsort(Show *arr, int n, int k) {
+  if (k > n) k = n;
+
+  Show *heap = malloc(k * sizeof(Show));
+  memcpy(heap, arr, k * sizeof(Show));
+  buildMinHeap(heap, k);
+
+  for (int i = k; i < n; i++) {
+    if (compareShows(&arr[i], &heap[0]) > 0) {
+      heap[0] = arr[i];
+      heapify(heap, k, 0);
     }
-    i = j;
   }
 
-  for (int i = 0; i < n; i++) arr[i] = output[i];
-  free(output);
-}
+  for (int i = k / 2 - 1; i >= 0; i--)
+    heapify(heap, k, i);
+  for (int i = k - 1; i > 0; i--) {
+    swap(&heap[0], &heap[i]);
+    heapify(heap, i, 0);
+  }
 
-void radixSortReleaseYear(Show *arr, int n, int *comparisons) {
-  int max = getMaxReleaseYear(arr, n);
-  for (int exp = 1; max / exp > 0; exp *= 10)
-    countingSortByDigit(arr, n, exp, comparisons);
-}
+  for (int i = 0; i < k; i++)
+    arr[i] = heap[i];
 
+  free(heap);
+}
 
 int main() {
   FILE *file = fopen("/tmp/disneyplus.csv", "r");
@@ -281,19 +281,10 @@ int main() {
     }
   }
 
-  clock_t start = clock();
-  int comparisons = 0;
-  radixSortReleaseYear(selecionados, countSelecionados, &comparisons);
-  clock_t end = clock();
+  partialHeapsort(selecionados, countSelecionados, 10);
 
-  for (int i = 0; i < countSelecionados; i++) printShow(&selecionados[i]);
-
-  FILE *log = fopen("866308_radixsort.txt", "w");
-  if (log) {
-    double timeTaken = (double)(end - start) / CLOCKS_PER_SEC;
-    fprintf(log, "866308\t%lf\t%d\n", timeTaken, comparisons);
-    fclose(log);
-  }
+  int limite = countSelecionados < 10 ? countSelecionados : 10;
+  for (int i = 0; i < limite; i++) printShow(&selecionados[i]);
 
   for (int i = 0; i < showCount; i++) freeShow(&shows[i]);
   free(shows);

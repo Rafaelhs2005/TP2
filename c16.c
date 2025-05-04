@@ -184,120 +184,74 @@ void printShow(const Show *show) {
   printf(" ##\n");
 }
 
-// ========== RADIX SORT COM DESEMPATE POR TITLE ==========
-
-
-//O Radix Sort é um algoritmo de ordenação não-comparativo que ordena os números dígito a dígito, começando pelo menos significativo até o mais significativo (LSB para MSB). É eficiente para ordenar inteiros ou strings com tamanho fixo.
-//Complexidade de tempo: O(nk), onde n é o número de elementos e k é o número de dígitos do maior número. Complexidade de espaço: O(n + k).
-
-
-int getMaxReleaseYear(Show *arr, int n) {
-  int max = arr[0].releaseYear;
-  for (int i = 1; i < n; i++)
-    if (arr[i].releaseYear > max) max = arr[i].releaseYear;
-  return max;
-}
-
-void countingSortByDigit(Show *arr, int n, int exp, int *comparisons) {
-  Show *output = malloc(n * sizeof(Show));
-  int count[10] = {0};
-
-  for (int i = 0; i < n; i++)
-    count[(arr[i].releaseYear / exp) % 10]++;
-
-  for (int i = 1; i < 10; i++)
-    count[i] += count[i - 1];
-
-  for (int i = n - 1; i >= 0; i--) {
-    int idx = (arr[i].releaseYear / exp) % 10;
-    output[--count[idx]] = arr[i];
+void insertionSortReleaseYear(Show *arr, int n, int *comparisons) {
+    for (int i = 1; i < n; i++) {
+      Show key = arr[i];
+      int j = i - 1;
+  
+      while (j >= 0) {
+        (*comparisons)++;
+        if (arr[j].releaseYear > key.releaseYear ||
+            (arr[j].releaseYear == key.releaseYear && strcmp(arr[j].title, key.title) > 0)) {
+          arr[j + 1] = arr[j];
+          j--;
+        } else {
+          break;
+        }
+      }
+  
+      arr[j + 1] = key;
+    }
   }
 
-  // Desempate por título entre elementos com mesmo releaseYear
-  int i = 0;
-  while (i < n) {
-    int j = i + 1;
-    while (j < n && output[j].releaseYear == output[i].releaseYear) j++;
-
-    for (int a = i; a < j - 1; a++) {
-      for (int b = i; b < j - 1 - (a - i); b++) {
-        (*comparisons)++;
-        if (strcmp(output[b].title, output[b + 1].title) > 0) {
-          Show tmp = output[b];
-          output[b] = output[b + 1];
-          output[b + 1] = tmp;
+  
+  int main() {
+    FILE *file = fopen("/tmp/disneyplus.csv", "r");
+    if (!file) {
+      perror("Erro ao abrir o arquivo");
+      return 1;
+    }
+  
+    char header[MAX_LINE_LENGTH];
+    fgets(header, MAX_LINE_LENGTH, file);
+  
+    Show *shows = NULL;
+    int showCount = 0;
+    char *line;
+    while ((line = readCompleteLine(file)) != NULL) {
+      Show show;
+      readShow(&show, line);
+      free(line);
+      shows = realloc(shows, (showCount + 1) * sizeof(Show));
+      shows[showCount++] = show;
+    }
+    fclose(file);
+  
+    Show *selecionados = NULL;
+    int countSelecionados = 0;
+    char idBuscado[MAX_ID_LENGTH];
+    while (1) {
+      if (fgets(idBuscado, MAX_ID_LENGTH, stdin) == NULL) break;
+      idBuscado[strcspn(idBuscado, "\n")] = '\0';
+      if (strcmp(idBuscado, "FIM") == 0) break;
+      for (int i = 0; i < showCount; i++) {
+        if (strcmp(shows[i].showId, idBuscado) == 0) {
+          selecionados = realloc(selecionados, (countSelecionados + 1) * sizeof(Show));
+          selecionados[countSelecionados++] = shows[i];
+          break;
         }
       }
     }
-    i = j;
+  
+    int comparisons = 0;
+    insertionSortReleaseYear(selecionados, countSelecionados, &comparisons);
+  
+    int limite = countSelecionados < 10 ? countSelecionados : 10;
+    for (int i = 0; i < limite; i++) printShow(&selecionados[i]);
+  
+    for (int i = 0; i < showCount; i++) freeShow(&shows[i]);
+    free(shows);
+    free(selecionados);
+  
+    return 0;
   }
-
-  for (int i = 0; i < n; i++) arr[i] = output[i];
-  free(output);
-}
-
-void radixSortReleaseYear(Show *arr, int n, int *comparisons) {
-  int max = getMaxReleaseYear(arr, n);
-  for (int exp = 1; max / exp > 0; exp *= 10)
-    countingSortByDigit(arr, n, exp, comparisons);
-}
-
-
-int main() {
-  FILE *file = fopen("/tmp/disneyplus.csv", "r");
-  if (!file) {
-    perror("Erro ao abrir o arquivo");
-    return 1;
-  }
-
-  char header[MAX_LINE_LENGTH];
-  fgets(header, MAX_LINE_LENGTH, file);
-
-  Show *shows = NULL;
-  int showCount = 0;
-  char *line;
-  while ((line = readCompleteLine(file)) != NULL) {
-    Show show;
-    readShow(&show, line);
-    free(line);
-    shows = realloc(shows, (showCount + 1) * sizeof(Show));
-    shows[showCount++] = show;
-  }
-  fclose(file);
-
-  Show *selecionados = NULL;
-  int countSelecionados = 0;
-  char idBuscado[MAX_ID_LENGTH];
-  while (1) {
-    if (fgets(idBuscado, MAX_ID_LENGTH, stdin) == NULL) break;
-    idBuscado[strcspn(idBuscado, "\n")] = '\0';
-    if (strcmp(idBuscado, "FIM") == 0) break;
-    for (int i = 0; i < showCount; i++) {
-      if (strcmp(shows[i].showId, idBuscado) == 0) {
-        selecionados = realloc(selecionados, (countSelecionados + 1) * sizeof(Show));
-        selecionados[countSelecionados++] = shows[i];
-        break;
-      }
-    }
-  }
-
-  clock_t start = clock();
-  int comparisons = 0;
-  radixSortReleaseYear(selecionados, countSelecionados, &comparisons);
-  clock_t end = clock();
-
-  for (int i = 0; i < countSelecionados; i++) printShow(&selecionados[i]);
-
-  FILE *log = fopen("866308_radixsort.txt", "w");
-  if (log) {
-    double timeTaken = (double)(end - start) / CLOCKS_PER_SEC;
-    fprintf(log, "866308\t%lf\t%d\n", timeTaken, comparisons);
-    fclose(log);
-  }
-
-  for (int i = 0; i < showCount; i++) freeShow(&shows[i]);
-  free(shows);
-  free(selecionados);
-
-  return 0;
-}
