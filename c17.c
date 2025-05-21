@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
 #define MAX_LINE_LENGTH 1024
 #define MAX_FIELDS 20
@@ -181,11 +180,11 @@ void printShow(const Show *show) {
   printf(" ##\n");
 }
 
-// === Heapsort parcial k=10 com desempate por title ===
-
-int compareShows(const Show *a, const Show *b) {
-  if (a->releaseYear != b->releaseYear)
-    return a->releaseYear - b->releaseYear;
+int compareByDirectorThenTitle(const Show *a, const Show *b) {
+  const char *dirA = (a->directorCount > 0) ? a->director[0] : "NaN";
+  const char *dirB = (b->directorCount > 0) ? b->director[0] : "NaN";
+  int cmp = strcmp(dirA, dirB);
+  if (cmp != 0) return cmp;
   return strcmp(a->title, b->title);
 }
 
@@ -200,9 +199,9 @@ void heapify(Show *arr, int n, int i) {
   int l = 2 * i + 1;
   int r = 2 * i + 2;
 
-  if (l < n && compareShows(&arr[l], &arr[smallest]) < 0)
+  if (l < n && compareByDirectorThenTitle(&arr[l], &arr[smallest]) > 0)
     smallest = l;
-  if (r < n && compareShows(&arr[r], &arr[smallest]) < 0)
+  if (r < n && compareByDirectorThenTitle(&arr[r], &arr[smallest]) > 0)
     smallest = r;
 
   if (smallest != i) {
@@ -211,7 +210,7 @@ void heapify(Show *arr, int n, int i) {
   }
 }
 
-void buildMinHeap(Show *arr, int n) {
+void buildMaxHeap(Show *arr, int n) {
   for (int i = n / 2 - 1; i >= 0; i--)
     heapify(arr, n, i);
 }
@@ -221,10 +220,10 @@ void partialHeapsort(Show *arr, int n, int k) {
 
   Show *heap = malloc(k * sizeof(Show));
   memcpy(heap, arr, k * sizeof(Show));
-  buildMinHeap(heap, k);
+  buildMaxHeap(heap, k);
 
   for (int i = k; i < n; i++) {
-    if (compareShows(&arr[i], &heap[0]) > 0) {
+    if (compareByDirectorThenTitle(&arr[i], &heap[0]) < 0) {
       heap[0] = arr[i];
       heapify(heap, k, 0);
     }
