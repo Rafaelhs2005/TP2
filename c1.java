@@ -106,7 +106,7 @@ class Games {
 
     public String getAppId() { return appId; }
     public Games() {}
-
+ja entga
     private String getField(String[] campos, int idx) {
         if (campos == null) return "NaN";
         if (idx < campos.length && campos[idx] != null && !campos[idx].isEmpty())
