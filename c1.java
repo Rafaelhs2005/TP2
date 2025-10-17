@@ -1,10 +1,11 @@
 import java.io.*;
 import java.util.*;
+import java.text.*;
 
 public class c1 {
 
     public static void main(String[] args) throws Exception {
-        BufferedReader br = new BufferedReader(new FileReader("games.csv"));
+        BufferedReader br = new BufferedReader(new FileReader("/tmp/games.csv"));
         String header = br.readLine(); // pula o cabeçalho
 
         List<Games> games = new ArrayList<>();
@@ -96,7 +97,7 @@ class Games {
     private float price;
     private String[] supportedLanguages;
     private int metacriticScore;
-    private int userScore;
+    private float userScore;
     private int achievements;
     private String publisher;
     private String developers;
@@ -106,7 +107,7 @@ class Games {
 
     public String getAppId() { return appId; }
     public Games() {}
-ja entga
+
     private String getField(String[] campos, int idx) {
         if (campos == null) return "NaN";
         if (idx < campos.length && campos[idx] != null && !campos[idx].isEmpty())
@@ -131,13 +132,28 @@ ja entga
         return out.toArray(new String[0]);
     }
 
+    private String formatarData(String original) {
+        if (original == null || original.equals("NaN") || original.isEmpty()) return "NaN";
+        try {
+            SimpleDateFormat entrada = new SimpleDateFormat("MMM dd, yyyy", Locale.ENGLISH);
+            SimpleDateFormat saida = new SimpleDateFormat("dd/MM/yyyy");
+            Date data = entrada.parse(original);
+            return saida.format(data);
+        } catch (Exception e) {
+            return original; // se não conseguir converter, retorna o valor original
+        }
+    }
+
     public void ler(String linha) {
         try {
             String[] campos = c1.splitCSV(linha);
 
             this.appId = getField(campos, 0);
             this.name = getField(campos, 1);
-            this.releaseDate = getField(campos, 2);
+
+            String rawDate = getField(campos, 2);
+            this.releaseDate = formatarData(rawDate);
+
             this.estimateOwners = getField(campos, 3);
 
             String priceStr = getField(campos, 4);
@@ -151,25 +167,18 @@ ja entga
             catch (Exception e) { this.metacriticScore = 0; }
 
             String uStr = getField(campos, 7);
-            try { this.userScore = uStr.equals("NaN") ? 0 : Integer.parseInt(uStr); }
+            try { this.userScore = uStr.equals("NaN") ? 0 : Float.parseFloat(uStr); }
             catch (Exception e) { this.userScore = 0; }
 
             String aStr = getField(campos, 8);
             try { this.achievements = aStr.equals("NaN") ? 0 : Integer.parseInt(aStr); }
             catch (Exception e) { this.achievements = 0; }
 
-
             this.publisher = getField(campos, 9);
             this.developers = getField(campos, 10);
-
-            String cat = getField(campos, 11);
-            this.categories = cat.equals("NaN") ? new String[0] : cat.split(",\\s*");
-
-            String gen = getField(campos, 12);
-            this.genres = gen.equals("NaN") ? new String[0] : gen.split(",\\s*");
-
-            String tg = getField(campos, 13);
-            this.tags = tg.equals("NaN") ? new String[0] : tg.split(",\\s*");
+            this.categories = parseListField(getField(campos, 11));
+            this.genres = parseListField(getField(campos, 12));
+            this.tags = parseListField(getField(campos, 13));
 
         } catch (Exception e) {
             System.out.println("Erro ao ler linha: " + e.getMessage());
@@ -177,14 +186,14 @@ ja entga
     }
 
     public void imprimir() {
-        System.out.print("===> " + appId + " ## " + name + " ## " + releaseDate + " ## ");
+        System.out.print("=> " + appId + " ## " + name + " ## " + releaseDate + " ## ");
         System.out.print(estimateOwners + " ## " + price + " ## ");
-        System.out.print((supportedLanguages.length > 0 ? Arrays.toString(supportedLanguages) : "NaN") + " ## ");
+        System.out.print(Arrays.toString(supportedLanguages) + " ## ");
         System.out.print(metacriticScore + " ## " + userScore + " ## " + achievements + " ## ");
-        System.out.print((publisher == null ? "NaN" : publisher) + " ## ");
-        System.out.print((developers == null ? "NaN" : developers) + " ## ");
-        System.out.print((categories.length > 0 ? Arrays.toString(categories) : "NaN") + " ## ");
-        System.out.print((genres.length > 0 ? Arrays.toString(genres) : "NaN") + " ## ");
-        System.out.print((tags.length > 0 ? Arrays.toString(tags) : "NaN") + " ##\n");
+        System.out.print("[" + publisher + "] ## ");
+        System.out.print("[" + developers + "] ## ");
+        System.out.print(Arrays.toString(categories) + " ## ");
+        System.out.print(Arrays.toString(genres) + " ## ");
+        System.out.print(Arrays.toString(tags) + " ##\n");
     }
 }
