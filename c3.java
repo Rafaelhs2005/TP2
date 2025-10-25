@@ -1,61 +1,79 @@
 import java.io.*;
 import java.util.*;
+import java.text.*;
 
 public class c3 {
+
     public static void main(String[] args) throws Exception {
-        BufferedReader br = new BufferedReader(new FileReader("/tmp/disneyplus.csv"));
+        BufferedReader br = new BufferedReader(new FileReader("games.csv"));
         String header = br.readLine(); // pula o cabeçalho
 
-        List<Show> shows = new ArrayList<>();
+        // Lê todos os games do CSV
+        List<Games> todos = new ArrayList<>();
         String linha;
-
         while ((linha = lerLinhaCompleta(br)) != null) {
-            Show s = new Show();
-            s.ler(linha);
-            shows.add(s);
+            Games g = new Games();
+            g.ler(linha);
+            todos.add(g);
         }
-
         br.close();
 
+        // --- Parte 1: ler IDs até "FIM" e guardar em um array ---
         Scanner in = new Scanner(System.in);
-        List<Show> selecionados = new ArrayList<>();
+        List<Games> selecionados = new ArrayList<>();
 
         while (true) {
-            String idBuscado = in.nextLine();
-            if (idBuscado.equals("FIM")) break;
+            String id = in.nextLine();
+            if (id.equals("FIM")) break;
 
-            boolean encontrado = false;
-            for (Show s : shows) {
-                if (s.getShowId().equals(idBuscado)) {
-                    selecionados.add(s);
-                    encontrado = true;
+            for (Games g : todos) {
+                if (g.getAppId().equals(id)) {
+                    selecionados.add(g);
                     break;
                 }
-            }
-
-            if (!encontrado) {
-                System.out.println("Show com ID \"" + idBuscado + "\" não encontrado.");
             }
         }
 
-        // Entrada de títulos
-        while (true) {
-            String tituloBuscado = in.nextLine();
-            if (tituloBuscado.equals("FIM")) break;
+        // Converter lista em array
+        Games[] array = selecionados.toArray(new Games[0]);
 
-            boolean achou = false;
-            for (Show s : selecionados) {
-                if (s.getTitle().equalsIgnoreCase(tituloBuscado)) {
-                    achou = true;
-                    break;
-                }
+        // --- Parte 2: ordenar por nome (e appId em caso de empate) ---
+        Arrays.sort(array, new Comparator<Games>() {
+            @Override
+            public int compare(Games a, Games b) {
+                int cmp = a.getName().compareToIgnoreCase(b.getName());
+                if (cmp == 0) return a.getAppId().compareTo(b.getAppId());
+                return cmp;
             }
+        });
 
-            System.out.println(achou ? "SIM" : "NAO");
+        // --- Parte 3: ler nomes até "FIM" e pesquisar com busca binária ---
+        while (true) {
+            String nome = in.nextLine();
+            if (nome.equals("FIM")) break;
+
+            boolean encontrado = buscaBinaria(array, nome);
+            System.out.println(encontrado ? "SIM" : "NAO");
         }
 
         in.close();
     }
+
+    // --- Função de busca binária ---
+    public static boolean buscaBinaria(Games[] array, String chave) {
+        int esq = 0, dir = array.length - 1;
+        while (esq <= dir) {
+            int meio = (esq + dir) / 2;
+            int cmp = array[meio].getName().compareToIgnoreCase(chave);
+
+            if (cmp == 0) return true;
+            else if (cmp < 0) esq = meio + 1;
+            else dir = meio - 1;
+        }
+        return false;
+    }
+
+    // --- Funções auxiliares para leitura CSV ---
 
     public static String lerLinhaCompleta(BufferedReader br) throws IOException {
         StringBuilder sb = new StringBuilder();
@@ -68,7 +86,6 @@ public class c3 {
             if (aspas % 2 == 0) break;
             sb.append("\n");
         }
-
         return sb.length() == 0 ? null : sb.toString();
     }
 
@@ -102,64 +119,94 @@ public class c3 {
     }
 }
 
-class Show {
-    private String showId;
-    private String type;
-    private String title;
+class Games {
+    private String appId;
+    private String name;
+    private String releaseDate;
+    private String estimateOwners;
+    private float price;
+    private String[] supportedLanguages;
+    private int metacriticScore;
+    private float userScore;
+    private int achievements;
+    private String publisher;
+    private String developers;
+    private String[] categories;
+    private String[] genres;
+    private String[] tags;
 
-    public String getShowId() {
-        return showId;
+    public String getAppId() { return appId; }
+    public String getName() { return name; }
+    public Games() {}
+
+    private String getField(String[] campos, int idx) {
+        if (campos == null) return "NaN";
+        if (idx < campos.length && campos[idx] != null && !campos[idx].isEmpty())
+            return campos[idx].trim();
+        return "NaN";
     }
 
-    public String getTitle() {
-        return title;
+    private String[] parseListField(String s) {
+        if (s == null || s.equals("NaN")) return new String[0];
+        String t = s.trim();
+        if (t.startsWith("[") && t.endsWith("]")) {
+            t = t.substring(1, t.length() - 1);
+        }
+        t = t.replace("'", "");
+        if (t.isEmpty()) return new String[0];
+        String[] parts = t.split(",\\s*");
+        List<String> out = new ArrayList<>();
+        for (String p : parts) {
+            String q = p.trim();
+            if (!q.isEmpty()) out.add(q);
+        }
+        return out.toArray(new String[0]);
     }
 
-    private String[] director;
-    private String[] cast;
-    private String country;
-    private String dateAdded;
-    private int releaseYear;
-    private String rating;
-    private String duration;
-    private String[] listedIn;
-
-    public Show() {}
-
-    public void imprimir() {
-        System.out.print("=> " + showId + " ## " + title + " ## " + type + " ## ");
-        System.out.print((director.length > 0 ? String.join(", ", director) : "NaN") + " ## ");
-        System.out.print((cast.length > 0 ? Arrays.toString(cast) : "NaN") + " ## ");
-        System.out.print(country + " ## ");
-        System.out.print(dateAdded + " ## ");
-        System.out.print(releaseYear + " ## ");
-        System.out.print(rating + " ## ");
-        System.out.print(duration + " ## ");
-        System.out.print((listedIn.length > 0 ? Arrays.toString(listedIn) : "NaN") + " ##\n");
+    private String formatarData(String original) {
+        if (original == null || original.equals("NaN") || original.isEmpty()) return "NaN";
+        try {
+            SimpleDateFormat entrada = new SimpleDateFormat("MMM dd, yyyy", Locale.ENGLISH);
+            SimpleDateFormat saida = new SimpleDateFormat("dd/MM/yyyy");
+            Date data = entrada.parse(original);
+            return saida.format(data);
+        } catch (Exception e) {
+            return original;
+        }
     }
 
     public void ler(String linha) {
         try {
-            String[] campos = c3.splitCSV(linha);
-            if (campos.length < 11) throw new IllegalArgumentException("Linha com campos insuficientes");
+            String[] campos = c1.splitCSV(linha);
 
-            this.showId = campos[0].isEmpty() ? "NaN" : campos[0].trim();
-            this.type = campos[1].isEmpty() ? "NaN" : campos[1].trim();
-            this.title = campos[2].isEmpty() ? "NaN" : campos[2].trim();
+            this.appId = getField(campos, 0);
+            this.name = getField(campos, 1);
+            this.releaseDate = formatarData(getField(campos, 2));
+            this.estimateOwners = getField(campos, 3);
 
-            this.director = campos[3].equals("NaN") ? new String[0] : campos[3].split(",\\s*");
-            Arrays.sort(this.director);
+            String priceStr = getField(campos, 4);
+            try { this.price = priceStr.equals("NaN") ? 0f : Float.parseFloat(priceStr); }
+            catch (Exception e) { this.price = 0f; }
 
-            this.cast = campos[4].equals("NaN") ? new String[0] : campos[4].split(",\\s*");
-            Arrays.sort(this.cast);
+            this.supportedLanguages = parseListField(getField(campos, 5));
 
-            this.country = campos[5].equals("NaN") || campos[5].isEmpty() ? "NaN" : campos[5].trim();
-            this.dateAdded = campos[6].equals("NaN") || campos[6].isEmpty() ? "March 1, 1900" : campos[6].trim();
-            this.releaseYear = campos[7].equals("NaN") || campos[7].isEmpty() ? 0 : Integer.parseInt(campos[7]);
-            this.rating = campos[8].equals("NaN") || campos[8].isEmpty() ? "NaN" : campos[8].trim();
-            this.duration = campos[9].equals("NaN") || campos[9].isEmpty() ? "NaN" : campos[9].trim();
-            this.listedIn = campos[10].equals("NaN") ? new String[0] : campos[10].split(",\\s*");
-            Arrays.sort(this.listedIn);
+            String mStr = getField(campos, 6);
+            try { this.metacriticScore = mStr.equals("NaN") ? 0 : Integer.parseInt(mStr); }
+            catch (Exception e) { this.metacriticScore = 0; }
+
+            String uStr = getField(campos, 7);
+            try { this.userScore = uStr.equals("NaN") ? 0 : Float.parseFloat(uStr); }
+            catch (Exception e) { this.userScore = 0; }
+
+            String aStr = getField(campos, 8);
+            try { this.achievements = aStr.equals("NaN") ? 0 : Integer.parseInt(aStr); }
+            catch (Exception e) { this.achievements = 0; }
+
+            this.publisher = getField(campos, 9);
+            this.developers = getField(campos, 10);
+            this.categories = parseListField(getField(campos, 11));
+            this.genres = parseListField(getField(campos, 12));
+            this.tags = parseListField(getField(campos, 13));
         } catch (Exception e) {
             System.out.println("Erro ao ler linha: " + e.getMessage());
         }
