@@ -4,7 +4,11 @@ import java.text.*;
 
 public class c3 {
 
+    static int comparacoes = 0; // contador global de comparações
+
     public static void main(String[] args) throws Exception {
+        long inicio = System.currentTimeMillis(); // início da contagem do tempo
+
         BufferedReader br = new BufferedReader(new FileReader("games.csv"));
         String header = br.readLine(); // pula o cabeçalho
 
@@ -57,13 +61,23 @@ public class c3 {
         }
 
         in.close();
+
+        long fim = System.currentTimeMillis();
+        double tempoExec = (fim - inicio) / 1000.0;
+
+        // --- Parte 4: gerar log ---
+        String matricula = "866308"; // 🔁 altere para a sua matrícula
+        try (PrintWriter log = new PrintWriter(new FileWriter(matricula + "_binaria.txt"))) {
+            log.printf("%s\t%.3f\t%d%n", matricula, tempoExec, comparacoes);
+        }
     }
 
-    // --- Função de busca binária ---
+    // --- Função de busca binária com contagem de comparações ---
     public static boolean buscaBinaria(Games[] array, String chave) {
         int esq = 0, dir = array.length - 1;
         while (esq <= dir) {
             int meio = (esq + dir) / 2;
+            comparacoes++;
             int cmp = array[meio].getName().compareToIgnoreCase(chave);
 
             if (cmp == 0) return true;
@@ -74,7 +88,6 @@ public class c3 {
     }
 
     // --- Funções auxiliares para leitura CSV ---
-
     public static String lerLinhaCompleta(BufferedReader br) throws IOException {
         StringBuilder sb = new StringBuilder();
         String linha;
@@ -177,7 +190,7 @@ class Games {
 
     public void ler(String linha) {
         try {
-            String[] campos = c1.splitCSV(linha);
+            String[] campos = c3.splitCSV(linha);
 
             this.appId = getField(campos, 0);
             this.name = getField(campos, 1);
