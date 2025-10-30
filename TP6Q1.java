@@ -1,85 +1,95 @@
 import java.io.*;
 import java.util.*;
+import java.text.*;
 
 public class TP6Q1 {
-    public static void main(String[] args) throws Exception {
-        BufferedReader br = new BufferedReader(new FileReader("/tmp/disneyplus.csv"));
-        String header = br.readLine(); // pula o cabeçalho
 
-        List<Show> shows = new ArrayList<>();
+    public static void main(String[] args) throws Exception {
+
+        BufferedReader br = new BufferedReader(new FileReader("/tmp/games.csv"));
+        String header = br.readLine();
+
+        Lista lista = new Lista();
         String linha;
 
+        ArrayList<Games> banco = new ArrayList<>();
         while ((linha = lerLinhaCompleta(br)) != null) {
-            Show s = new Show();
-            s.ler(linha);
-            shows.add(s);
+            Games g = new Games();
+            g.ler(linha);
+            banco.add(g);
         }
-
         br.close();
 
         Scanner in = new Scanner(System.in);
-        List<Show> selecionados = new ArrayList<>();
 
-        // Entrada de IDs
         while (true) {
-            String idBuscado = in.nextLine();
-            if (idBuscado.equals("FIM")) break;
+            String id = in.nextLine();
+            if (id.equals("FIM")) break;
 
-            boolean encontrado = false;
-            for (Show s : shows) {
-                if (s.getShowId().equals(idBuscado)) {
-                    selecionados.add(s);
-                    encontrado = true;
+            Games g = buscarPorID(banco, id);
+            if (g != null) lista.inserirFim(g);
+        }
+
+        int n = Integer.parseInt(in.nextLine());
+        for (int i = 0; i < n; i++) {
+
+            String entrada = in.nextLine();
+            String[] parts = entrada.split(" ");
+
+            switch (parts[0]) {
+
+                case "II": { // Inserir início
+                    Games g = buscarPorID(banco, parts[1]);
+                    if (g != null) lista.inserirInicio(g);
+                    break;
+                }
+
+                case "IF": { // Inserir fim
+                    Games g = buscarPorID(banco, parts[1]);
+                    if (g != null) lista.inserirFim(g);
+                    break;
+                }
+
+                case "I*": { // Inserir posição
+                    int pos = Integer.parseInt(parts[1]);
+                    Games g = buscarPorID(banco, parts[2]);
+                    if (g != null) lista.inserir(g, pos);
+                    break;
+                }
+
+                case "RI": { // Remover início
+                    Games g = lista.removerInicio();
+                    System.out.println("(R) " + g.getName());
+                    break;
+                }
+
+                case "RF": { // remover fim
+                    Games g = lista.removerFim();
+                    System.out.println("(R) " + g.getName());
+                    break;
+                }
+
+                case "R*": { // remover posição
+                    int pos = Integer.parseInt(parts[1]);
+                    Games g = lista.remover(pos);
+                    System.out.println("(R) " + g.getName());
                     break;
                 }
             }
-
-            if (!encontrado) {
-                System.out.println("Show com ID \"" + idBuscado + "\" não encontrado.");
-            }
         }
 
-        // Converte lista para vetor e mede tempo + comparações da ordenação
-        Show[] vetor = selecionados.toArray(new Show[0]);
-        long inicio = System.currentTimeMillis();
-        int comparacoes = selectionSortPorTitulo(vetor);
-        long fim = System.currentTimeMillis();
-        long tempoExecucao = fim - inicio;
-
-        // Imprime vetor ordenado
-        for (Show s : vetor) {
-            s.imprimir();
-        }
-
-        // Escreve arquivo de log
-        try (PrintWriter writer = new PrintWriter(new FileWriter("866308_sequencial.txt"))) {
-            writer.println("866308\t" + tempoExecucao + "\t" + comparacoes);
-        } catch (IOException e) {
-            System.out.println("Erro ao escrever no arquivo de log: " + e.getMessage());
-        }
-
+        lista.mostrar();
         in.close();
     }
 
-    public static int selectionSortPorTitulo(Show[] vetor) {
-        int comparacoes = 0;
-        for (int i = 0; i < vetor.length - 1; i++) {
-            int menor = i;
-            for (int j = i + 1; j < vetor.length; j++) {
-                comparacoes++;
-                if (vetor[j].getTitle().compareToIgnoreCase(vetor[menor].getTitle()) < 0) {
-                    menor = j;
-                }
-            }
-            if (menor != i) {
-                Show temp = vetor[i];
-                vetor[i] = vetor[menor];
-                vetor[menor] = temp;
-            }
+    public static Games buscarPorID(ArrayList<Games> banco, String id) {
+        for (Games g : banco) {
+            if (g.getAppId().equals(id)) return g;
         }
-        return comparacoes;
+        return null;
     }
 
+    // --- FUNÇÕES CSV ---
     public static String lerLinhaCompleta(BufferedReader br) throws IOException {
         StringBuilder sb = new StringBuilder();
         String linha;
@@ -88,18 +98,16 @@ public class TP6Q1 {
         while ((linha = br.readLine()) != null) {
             sb.append(linha);
             aspas += contarAspas(linha);
+
             if (aspas % 2 == 0) break;
             sb.append("\n");
         }
-
         return sb.length() == 0 ? null : sb.toString();
     }
 
     public static int contarAspas(String linha) {
         int count = 0;
-        for (char c : linha.toCharArray()) {
-            if (c == '"') count++;
-        }
+        for (char c : linha.toCharArray()) if (c == '"') count++;
         return count;
     }
 
@@ -119,72 +127,215 @@ public class TP6Q1 {
                 sb.append(c);
             }
         }
-
         campos.add(sb.length() == 0 ? "NaN" : sb.toString());
         return campos.toArray(new String[0]);
     }
 }
 
-class Show {
-    private String showId;
-    private String type;
-    private String title;
+class Celula {
+    public Games elemento;
+    public Celula prox;
+    public Celula(Games elemento) {
+        this.elemento = elemento;
+        this.prox = null;
+    }
+}
 
-    public String getShowId() {
-        return showId;
+class Lista {
+    Celula primeiro, ultimo;
+    int tamanho;
+
+    public Lista() {
+        primeiro = new Celula(null);
+        ultimo = primeiro;
+        tamanho = 0;
     }
 
-    public String getTitle() {
-        return title;
+    void inserirInicio(Games x) {
+        Celula tmp = new Celula(x);
+        tmp.prox = primeiro.prox;
+        primeiro.prox = tmp;
+        if (primeiro == ultimo) {
+            ultimo = tmp;
+        }
+        tamanho++;
     }
 
-    private String[] director;
-    private String[] cast;
-    private String country;
-    private String dateAdded;
-    private int releaseYear;
-    private String rating;
-    private String duration;
-    private String[] listedIn;
+    void inserirFim(Games x) {
+        ultimo.prox = new Celula(x);
+        ultimo = ultimo.prox;
+        tamanho++;
+    }
 
-    public Show() {}
+    void inserir(Games x, int pos) {
+        if (pos < 0 || pos > tamanho) throw new IllegalArgumentException();
+        else if (pos == 0) inserirInicio(x);
+        else if (pos == tamanho) inserirFim(x);
+        else {
+            Celula i = primeiro;
+            for (int j = 0; j < pos; j++, i = i.prox);
+            Celula tmp = new Celula(x);
+            tmp.prox = i.prox;
+            i.prox = tmp;
+            tamanho++;
+        }
+    }
 
-    public void imprimir() {
-        System.out.print("=> " + showId + " ## " + title + " ## " + type + " ## ");
-        System.out.print((director.length > 0 ? String.join(", ", director) : "NaN") + " ## ");
-        System.out.print((cast.length > 0 ? Arrays.toString(cast) : "NaN") + " ## ");
-        System.out.print(country + " ## ");
-        System.out.print(dateAdded + " ## ");
-        System.out.print(releaseYear + " ## ");
-        System.out.print(rating + " ## ");
-        System.out.print(duration + " ## ");
-        System.out.print((listedIn.length > 0 ? Arrays.toString(listedIn) : "NaN") + " ##\n");
+    Games removerInicio() {
+        if (primeiro == ultimo) throw new IllegalArgumentException("Vazia");
+        Celula tmp = primeiro.prox;
+        primeiro.prox = tmp.prox;
+        if (tmp == ultimo) ultimo = primeiro;
+        tamanho--;
+        return tmp.elemento;
+    }
+
+    Games removerFim() {
+        if (primeiro == ultimo) throw new IllegalArgumentException("Vazia");
+
+        Celula i = primeiro;
+        while (i.prox != ultimo) i = i.prox;
+
+        Games resp = ultimo.elemento;
+        ultimo = i;
+        ultimo.prox = null;
+        tamanho--;
+        return resp;
+    }
+
+    Games remover(int pos) {
+        if (pos < 0 || pos >= tamanho) throw new IllegalArgumentException();
+        else if (pos == 0) return removerInicio();
+        else if (pos == tamanho - 1) return removerFim();
+        else {
+            Celula i = primeiro;
+            for (int j = 0; j < pos; j++, i = i.prox);
+            Celula tmp = i.prox;
+            i.prox = tmp.prox;
+            tamanho--;
+            return tmp.elemento;
+        }
+    }
+
+    void mostrar() {
+        int cont = 0;
+        for (Celula i = primeiro.prox; i != null; i = i.prox, cont++) {
+            System.out.print("[" + cont + "] ");
+            i.elemento.imprimir();
+        }
+    }
+}
+
+class Games {
+    private String appId;
+    private String name;
+    private String releaseDate;
+    private String estimateOwners;
+    private float price;
+    private String[] supportedLanguages;
+    private int metacriticScore;
+    private float userScore;
+    private int achievements;
+    private String publisher;
+    private String developers;
+    private String[] categories;
+    private String[] genres;
+    private String[] tags;
+
+    public String getAppId() { return appId; }
+
+    public Games() {}
+
+    private String getField(String[] campos, int idx) {
+        if (campos == null) return "NaN";
+        if (idx < campos.length && campos[idx] != null && !campos[idx].isEmpty())
+            return campos[idx].trim();
+        return "NaN";
+    }
+
+    public String getName() {
+        return this.name;
+    }
+
+    private String[] parseListField(String s) {
+        if (s == null || s.equals("NaN")) return new String[0];
+        String t = s.trim();
+        if (t.startsWith("[") && t.endsWith("]")) {
+            t = t.substring(1, t.length() - 1);
+        }
+        t = t.replace("'", "");
+        if (t.isEmpty()) return new String[0];
+        String[] parts = t.split(",\\s*");
+        List<String> out = new ArrayList<>();
+        for (String p : parts) {
+            String q = p.trim();
+            if (!q.isEmpty()) out.add(q);
+        }
+        return out.toArray(new String[0]);
+    }
+
+    private String formatarData(String original) {
+        if (original == null || original.equals("NaN") || original.isEmpty()) return "NaN";
+        try {
+            SimpleDateFormat entrada = new SimpleDateFormat("MMM dd, yyyy", Locale.ENGLISH);
+            SimpleDateFormat saida = new SimpleDateFormat("dd/MM/yyyy");
+            Date data = entrada.parse(original);
+            return saida.format(data);
+        } catch (Exception e) {
+            return original;
+        }
     }
 
     public void ler(String linha) {
         try {
             String[] campos = TP6Q1.splitCSV(linha);
-            if (campos.length < 11) throw new IllegalArgumentException("Linha com campos insuficientes");
 
-            this.showId = campos[0].isEmpty() ? "NaN" : campos[0].trim();
-            this.type = campos[1].isEmpty() ? "NaN" : campos[1].trim();
-            this.title = campos[2].isEmpty() ? "NaN" : campos[2].trim();
+            this.appId = getField(campos, 0);
+            this.name = getField(campos, 1);
 
-            this.director = campos[3].equals("NaN") ? new String[0] : campos[3].split(",\\s*");
-            Arrays.sort(this.director);
+            String rawDate = getField(campos, 2);
+            this.releaseDate = formatarData(rawDate);
 
-            this.cast = campos[4].equals("NaN") ? new String[0] : campos[4].split(",\\s*");
-            Arrays.sort(this.cast);
+            this.estimateOwners = getField(campos, 3);
 
-            this.country = campos[5].equals("NaN") || campos[5].isEmpty() ? "NaN" : campos[5].trim();
-            this.dateAdded = campos[6].equals("NaN") || campos[6].isEmpty() ? "March 1, 1900" : campos[6].trim();
-            this.releaseYear = campos[7].equals("NaN") || campos[7].isEmpty() ? 0 : Integer.parseInt(campos[7]);
-            this.rating = campos[8].equals("NaN") || campos[8].isEmpty() ? "NaN" : campos[8].trim();
-            this.duration = campos[9].equals("NaN") || campos[9].isEmpty() ? "NaN" : campos[9].trim();
-            this.listedIn = campos[10].equals("NaN") ? new String[0] : campos[10].split(",\\s*");
-            Arrays.sort(this.listedIn);
+            String priceStr = getField(campos, 4);
+            try { this.price = priceStr.equals("NaN") ? 0f : Float.parseFloat(priceStr); }
+            catch (Exception e) { this.price = 0f; }
+
+            this.supportedLanguages = parseListField(getField(campos, 5));
+
+            String mStr = getField(campos, 6);
+            try { this.metacriticScore = mStr.equals("NaN") ? 0 : Integer.parseInt(mStr); }
+            catch (Exception e) { this.metacriticScore = 0; }
+
+            String uStr = getField(campos, 7);
+            try { this.userScore = uStr.equals("NaN") ? 0 : Float.parseFloat(uStr); }
+            catch (Exception e) { this.userScore = 0; }
+
+            String aStr = getField(campos, 8);
+            try { this.achievements = aStr.equals("NaN") ? 0 : Integer.parseInt(aStr); }
+            catch (Exception e) { this.achievements = 0; }
+
+            this.publisher = getField(campos, 9);
+            this.developers = getField(campos, 10);
+            this.categories = parseListField(getField(campos, 11));
+            this.genres = parseListField(getField(campos, 12));
+            this.tags = parseListField(getField(campos, 13));
+
         } catch (Exception e) {
             System.out.println("Erro ao ler linha: " + e.getMessage());
         }
+    }
+
+    public void imprimir() {
+        System.out.print("=> " + appId + " ## " + name + " ## " + releaseDate + " ## ");
+        System.out.print(estimateOwners + " ## " + price + " ## ");
+        System.out.print(Arrays.toString(supportedLanguages) + " ## ");
+        System.out.print(metacriticScore + " ## " + userScore + " ## " + achievements + " ## ");
+        System.out.print("[" + publisher + "] ## ");
+        System.out.print("[" + developers + "] ## ");
+        System.out.print(Arrays.toString(categories) + " ## ");
+        System.out.print(Arrays.toString(genres) + " ## ");
+        System.out.print(Arrays.toString(tags) + " ##\n");
     }
 }
