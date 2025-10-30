@@ -1,7 +1,7 @@
 import java.io.*;
 import java.util.*;
 
-public class c5 {
+public class TP6Q1 {
     public static void main(String[] args) throws Exception {
         BufferedReader br = new BufferedReader(new FileReader("/tmp/disneyplus.csv"));
         String header = br.readLine(); // pula o cabeçalho
@@ -163,7 +163,7 @@ class Show {
 
     public void ler(String linha) {
         try {
-            String[] campos = c5.splitCSV(linha);
+            String[] campos = TP6Q1.splitCSV(linha);
             if (campos.length < 11) throw new IllegalArgumentException("Linha com campos insuficientes");
 
             this.showId = campos[0].isEmpty() ? "NaN" : campos[0].trim();
