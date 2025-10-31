@@ -7,7 +7,7 @@ public class TP6Q4 {
     public static void main(String[] args) throws Exception {
 
         BufferedReader br = new BufferedReader(new FileReader("/tmp/games.csv"));
-        String header = br.readLine();
+        String header = br.readLine();  
 
         Fila fila = new Fila();
         String linha;
@@ -149,5 +149,119 @@ class Fila {
             System.out.print("[" + cont + "] ");
             i.elemento.imprimir();
         }
+    }
+}
+
+class Games {
+    private String appId;
+    private String name;
+    private String releaseDate;
+    private String estimateOwners;
+    private float price;
+    private String[] supportedLanguages;
+    private int metacriticScore;
+    private float userScore;
+    private int achievements;
+    private String publisher;
+    private String developers;
+    private String[] categories;
+    private String[] genres;
+    private String[] tags;
+
+    public String getAppId() { return appId; }
+
+    public Games() {}
+
+    private String getField(String[] campos, int idx) {
+        if (campos == null) return "NaN";
+        if (idx < campos.length && campos[idx] != null && !campos[idx].isEmpty())
+            return campos[idx].trim();
+        return "NaN";
+    }
+
+    public String getName() {
+        return this.name;
+    }
+
+    private String[] parseListField(String s) {
+        if (s == null || s.equals("NaN")) return new String[0];
+        String t = s.trim();
+        if (t.startsWith("[") && t.endsWith("]")) {
+            t = t.substring(1, t.length() - 1);
+        }
+        t = t.replace("'", "");
+        if (t.isEmpty()) return new String[0];
+        String[] parts = t.split(",\\s*");
+        List<String> out = new ArrayList<>();
+        for (String p : parts) {
+            String q = p.trim();
+            if (!q.isEmpty()) out.add(q);
+        }
+        return out.toArray(new String[0]);
+    }
+
+    private String formatarData(String original) {
+        if (original == null || original.equals("NaN") || original.isEmpty()) return "NaN";
+        try {
+            SimpleDateFormat entrada = new SimpleDateFormat("MMM dd, yyyy", Locale.ENGLISH);
+            SimpleDateFormat saida = new SimpleDateFormat("dd/MM/yyyy");
+            Date data = entrada.parse(original);
+            return saida.format(data);
+        } catch (Exception e) {
+            return original;
+        }
+    }
+
+    public void ler(String linha) {
+        try {
+            String[] campos = TP6Q4.splitCSV(linha);
+
+            this.appId = getField(campos, 0);
+            this.name = getField(campos, 1);
+
+            String rawDate = getField(campos, 2);
+            this.releaseDate = formatarData(rawDate);
+
+            this.estimateOwners = getField(campos, 3);
+
+            String priceStr = getField(campos, 4);
+            try { this.price = priceStr.equals("NaN") ? 0f : Float.parseFloat(priceStr); }
+            catch (Exception e) { this.price = 0f; }
+
+            this.supportedLanguages = parseListField(getField(campos, 5));
+
+            String mStr = getField(campos, 6);
+            try { this.metacriticScore = mStr.equals("NaN") ? 0 : Integer.parseInt(mStr); }
+            catch (Exception e) { this.metacriticScore = 0; }
+
+            String uStr = getField(campos, 7);
+            try { this.userScore = uStr.equals("NaN") ? 0 : Float.parseFloat(uStr); }
+            catch (Exception e) { this.userScore = 0; }
+
+            String aStr = getField(campos, 8);
+            try { this.achievements = aStr.equals("NaN") ? 0 : Integer.parseInt(aStr); }
+            catch (Exception e) { this.achievements = 0; }
+
+            this.publisher = getField(campos, 9);
+            this.developers = getField(campos, 10);
+            this.categories = parseListField(getField(campos, 11));
+            this.genres = parseListField(getField(campos, 12));
+            this.tags = parseListField(getField(campos, 13));
+
+        } catch (Exception e) {
+            System.out.println("Erro ao ler linha: " + e.getMessage());
+        }
+    }
+
+    public void imprimir() {
+        System.out.print("=> " + appId + " ## " + name + " ## " + releaseDate + " ## ");
+        System.out.print(estimateOwners + " ## " + price + " ## ");
+        System.out.print(Arrays.toString(supportedLanguages) + " ## ");
+        System.out.print(metacriticScore + " ## " + userScore + " ## " + achievements + " ## ");
+        System.out.print("[" + publisher + "] ## ");
+        System.out.print("[" + developers + "] ## ");
+        System.out.print(Arrays.toString(categories) + " ## ");
+        System.out.print(Arrays.toString(genres) + " ## ");
+        System.out.print(Arrays.toString(tags) + " ##\n");
     }
 }
