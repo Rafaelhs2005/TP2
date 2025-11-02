@@ -1,298 +1,407 @@
 #include <ctype.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define MAX_LINE_LENGTH 1024
-#define MAX_FIELDS 20
-#define MAX_ARRAY_SIZE 50
-#define MAX_ID_LENGTH 20
+typedef struct {
+    char **data;
+    int size;
+    int capacity;
+} StringList;
+
+void initStringList(StringList *list) {
+    list->data = NULL;
+    list->size = 0;
+    list->capacity = 0;
+}
+
+void addToStringList(StringList *list, const char *str) {
+    if (list->size >= list->capacity) {
+        list->capacity = list->capacity == 0 ? 4 : list->capacity * 2;
+        list->data = realloc(list->data, list->capacity * sizeof(char *));
+    }
+    list->data[list->size] = malloc(strlen(str) + 1);
+    strcpy(list->data[list->size], str);
+    list->size++;
+}
+
+void freeStringList(StringList *list) {
+    for (int i = 0; i < list->size; i++)
+        free(list->data[i]);
+    free(list->data);
+    list->data = NULL;
+    list->size = list->capacity = 0;
+}
+
+StringList copyStringList(const StringList *src) {
+    StringList dst;
+    initStringList(&dst);
+    for (int i = 0; i < src->size; i++)
+        addToStringList(&dst, src->data[i]);
+    return dst;
+}
 
 typedef struct {
-  char *showId;
-  char *type;
-  char *title;
-  char **director;
-  int directorCount;
-  char **cast;
-  int castCount;
-  char *country;
-  char *dateAdded;
-  int releaseYear;
-  char *rating;
-  char *duration;
-  char **listedIn;
-  int listedInCount;
-} Show;
+    char appId[100];
+    char name[500];
+    char releaseDate[50];
+    char estimateOwners[100];
+    float price;
 
-int compareStrings(const void *a, const void *b) {
-  return strcmp(*(const char **)a, *(const char **)b);
+    StringList supportedLanguages;
+
+    int metacriticScore;
+    float userScore;
+    int achievements;
+
+    char publisher[500];
+    char developers[500];
+
+    StringList categories;
+    StringList genres;
+    StringList tags;
+} Games;
+
+Games copyGames(const Games *src) {
+    Games dst = *src;
+
+    dst.supportedLanguages = copyStringList(&src->supportedLanguages);
+    dst.categories        = copyStringList(&src->categories);
+    dst.genres            = copyStringList(&src->genres);
+    dst.tags              = copyStringList(&src->tags);
+
+    return dst;
 }
 
-void sortStringArray(char **array, int count) {
-  if (array != NULL && count > 1) {
-    qsort(array, count, sizeof(char *), compareStrings);
-  }
+int contarAspas(const char *s){
+    int c = 0;
+    while(*s) if(*s++ == '"') c++;
+    return c;
 }
 
-int countQuotes(const char *line) {
-  int count = 0;
-  while (*line) {
-    if (*line == '"') count++;
-    line++;
-  }
-  return count;
+char *lerLinhaCompleta(FILE *file) {
+    char buffer[10000];
+    char *result = NULL;
+    size_t total = 0;
+    int aspas = 0;
+
+    while (fgets(buffer, sizeof(buffer), file)) {
+        int len = strlen(buffer);
+        aspas += contarAspas(buffer);
+
+        result = realloc(result, total + len + 1);
+        if (!result) return NULL;
+
+        if (total == 0)
+            strcpy(result, buffer);
+        else
+            strcat(result, buffer);
+
+        total += len;
+
+        if (aspas % 2 == 0)
+            break;
+    }
+    return result;
 }
 
-char *readCompleteLine(FILE *file) {
-  char buffer[MAX_LINE_LENGTH];
-  char *line = NULL;
-  size_t totalLength = 0;
-  int quotes = 0;
+StringList splitCSV(const char *linha) {
+    StringList campos;
+    initStringList(&campos);
 
-  do {
-    if (fgets(buffer, MAX_LINE_LENGTH, file) == NULL) {
-      break;
+    char *buffer = malloc(strlen(linha) + 1);
+    strcpy(buffer, linha);
+
+    int aspas = 0;
+    char *start = buffer;
+
+    for (char *p = buffer; *p; p++) {
+        if (*p == '"')
+            aspas = !aspas;
+        else if (*p == ',' && !aspas) {
+            *p = '\0';
+            addToStringList(&campos, strlen(start) ? start : "NaN");
+            start = p + 1;
+        }
+    }
+    addToStringList(&campos, strlen(start) ? start : "NaN");
+
+    free(buffer);
+    return campos;
+}
+
+const char *getField(const StringList *campos, int idx) {
+    if (!campos || idx < 0 || idx >= campos->size)
+        return "NaN";
+    return strlen(campos->data[idx]) ? campos->data[idx] : "NaN";
+}
+
+StringList parseListField(const char *s) {
+    StringList result;
+    initStringList(&result);
+
+    if (!s || strcmp(s, "NaN") == 0)
+        return result;
+
+    char *temp = malloc(strlen(s) + 1);
+    strcpy(temp, s);
+
+    char *start = temp;
+    char *end = temp + strlen(temp) - 1;
+
+    if (*start == '[' && *end == ']') {
+        *end = '\0';
+        start++;
     }
 
-    quotes += countQuotes(buffer);
-    size_t bufferLength = strlen(buffer);
-    char *newLine = realloc(line, totalLength + bufferLength + 1);
-    if (newLine == NULL) {
-      free(line);
-      return NULL;
+    for (char *p = start; *p; p++)
+        if (*p == '\'') *p = ' ';
+
+    char *token = strtok(start, ",");
+    while (token) {
+        while (isspace((unsigned char)*token)) token++;
+        char *e = token + strlen(token) - 1;
+        while (e > token && isspace((unsigned char)*e)) *e-- = '\0';
+        if (strlen(token))
+            addToStringList(&result, token);
+        token = strtok(NULL, ",");
     }
 
-    line = newLine;
-    strcpy(line + totalLength, buffer);
-    totalLength += bufferLength;
-  } while (quotes % 2 != 0);
-
-  if (totalLength > 0 && line[totalLength - 1] == '\n') {
-    line[totalLength - 1] = '\0';
-  }
-
-  return line;
+    free(temp);
+    return result;
 }
 
-void trim(char *str) {
-  int i = 0, j = 0;
-  while (isspace((unsigned char)str[i])) i++;
-  while (str[i]) str[j++] = str[i++];
-  str[j] = '\0';
-  while (j > 0 && isspace((unsigned char)str[j - 1])) str[--j] = '\0';
+static const char* month_to_num(const char *m3){
+    if(!m3) return "00";
+    if(!strncasecmp(m3,"Jan",3)) return "01";
+    if(!strncasecmp(m3,"Feb",3)) return "02";
+    if(!strncasecmp(m3,"Mar",3)) return "03";
+    if(!strncasecmp(m3,"Apr",3)) return "04";
+    if(!strncasecmp(m3,"May",3)) return "05";
+    if(!strncasecmp(m3,"Jun",3)) return "06";
+    if(!strncasecmp(m3,"Jul",3)) return "07";
+    if(!strncasecmp(m3,"Aug",3)) return "08";
+    if(!strncasecmp(m3,"Sep",3)) return "09";
+    if(!strncasecmp(m3,"Oct",3)) return "10";
+    if(!strncasecmp(m3,"Nov",3)) return "11";
+    if(!strncasecmp(m3,"Dec",3)) return "12";
+    return "00";
 }
 
-void splitCSV(const char *line, char **fields, int *fieldCount) {
-  bool inQuotes = false;
-  char *field = malloc(MAX_LINE_LENGTH);
-  int fieldPos = 0;
-  *fieldCount = 0;
+static void format_date(char *dest, const char *orig){
+    char m3[8]={0}; 
+    int day=0, year=0;
 
-  for (int i = 0; line[i] != '\0'; i++) {
-    if (line[i] == '"') {
-      inQuotes = !inQuotes;
-    } else if (line[i] == ',' && !inQuotes) {
-      field[fieldPos] = '\0';
-      trim(field);
-      fields[*fieldCount] = strcmp(field, "") == 0 ? strdup("NaN") : strdup(field);
-      (*fieldCount)++;
-      fieldPos = 0;
-      free(field);
-      field = malloc(MAX_LINE_LENGTH);
+    if(sscanf(orig,"%3s %d, %d",m3,&day,&year) == 3){
+        snprintf(dest,32,"%02d/%s/%d",day,month_to_num(m3),year);
     } else {
-      field[fieldPos++] = line[i];
+        strncpy(dest, orig, 31);
+        dest[31]='\0';
     }
-  }
-
-  field[fieldPos] = '\0';
-  trim(field);
-  fields[*fieldCount] = strcmp(field, "") == 0 ? strdup("NaN") : strdup(field);
-  (*fieldCount)++;
-  free(field);
 }
 
-void splitArray(char *str, char ***array, int *count) {
-  if (strcmp(str, "NaN") == 0) {
-    *array = NULL;
-    *count = 0;
-    return;
-  }
+void lerGames(Games *g, const char *linha) {
+    StringList campos = splitCSV(linha);
 
-  char **tempArray = malloc(MAX_ARRAY_SIZE * sizeof(char *));
-  char *token = strtok(str, ",");
-  *count = 0;
+    strncpy(g->appId, getField(&campos,0), sizeof(g->appId)-1);
+    g->appId[sizeof(g->appId)-1] = '\0';
 
-  while (token != NULL && *count < MAX_ARRAY_SIZE) {
-    trim(token);
-    tempArray[*count] = strdup(token);
-    (*count)++;
-    token = strtok(NULL, ",");
-  }
+    strncpy(g->name, getField(&campos,1), sizeof(g->name)-1);
+    g->name[sizeof(g->name)-1] = '\0';
 
-  *array = malloc(*count * sizeof(char *));
-  for (int i = 0; i < *count; i++) {
-    (*array)[i] = tempArray[i];
-  }
-  free(tempArray);
-  sortStringArray(*array, *count);
+    char raw[50];
+    strncpy(raw, getField(&campos,2), sizeof(raw)-1);
+    raw[sizeof(raw)-1]='\0';
+    format_date(g->releaseDate, raw);
+
+    strncpy(g->estimateOwners, getField(&campos,3),sizeof(g->estimateOwners)-1);
+    g->estimateOwners[sizeof(g->estimateOwners)-1]='\0';
+
+    const char *pr = getField(&campos,4);
+    g->price = strcmp(pr,"NaN") ? atof(pr) : 0.0f;
+
+    g->supportedLanguages = parseListField(getField(&campos,5));
+    g->metacriticScore = strcmp(getField(&campos,6),"NaN") ? atoi(getField(&campos,6)) : 0;
+    g->userScore       = strcmp(getField(&campos,7),"NaN") ? atof(getField(&campos,7)) : 0;
+    g->achievements    = strcmp(getField(&campos,8),"NaN") ? atoi(getField(&campos,8)) : 0;
+
+    strncpy(g->publisher,  getField(&campos,9),  sizeof(g->publisher)-1);
+    strncpy(g->developers, getField(&campos,10), sizeof(g->developers)-1);
+
+    g->categories = parseListField(getField(&campos,11));
+    g->genres     = parseListField(getField(&campos,12));
+    g->tags       = parseListField(getField(&campos,13));
+
+    for(int i=0;i<campos.size;i++)
+        free(campos.data[i]);
+    free(campos.data);
 }
 
-void freeShow(Show *show) {
-  free(show->showId);
-  free(show->type);
-  free(show->title);
-  for (int i = 0; i < show->directorCount; i++) free(show->director[i]);
-  free(show->director);
-  for (int i = 0; i < show->castCount; i++) free(show->cast[i]);
-  free(show->cast);
-  free(show->country);
-  free(show->dateAdded);
-  free(show->rating);
-  free(show->duration);
-  for (int i = 0; i < show->listedInCount; i++) free(show->listedIn[i]);
-  free(show->listedIn);
-}
+void imprimirGames(const Games *g) {
+    printf("=> %s ## %s ## %s ## %s ## %.2f ## ",
+           g->appId, g->name, g->releaseDate, g->estimateOwners, g->price);
 
-void readShow(Show *show, const char *line) {
-  char *fields[MAX_FIELDS];
-  int fieldCount;
-  splitCSV(line, fields, &fieldCount);
-
-  if (fieldCount < 11) {
-    printf("Linha com campos insuficientes\n");
-    return;
-  }
-
-  show->showId = strdup(fields[0]);
-  show->type = strdup(fields[1]);
-  show->title = strdup(fields[2]);
-  splitArray(fields[3], &show->director, &show->directorCount);
-  splitArray(fields[4], &show->cast, &show->castCount);
-  show->country = strcmp(fields[5], "NaN") == 0 ? strdup("NaN") : strdup(fields[5]);
-  show->dateAdded = (strcmp(fields[6], "NaN") == 0 || strcmp(fields[6], "") == 0)
-                    ? strdup("March 1, 1900") : strdup(fields[6]);
-  show->releaseYear = (strcmp(fields[7], "NaN") == 0 || strcmp(fields[7], "") == 0)
-                      ? 0 : atoi(fields[7]);
-  show->rating = strcmp(fields[8], "NaN") == 0 ? strdup("NaN") : strdup(fields[8]);
-  show->duration = strcmp(fields[9], "NaN") == 0 ? strdup("NaN") : strdup(fields[9]);
-  splitArray(fields[10], &show->listedIn, &show->listedInCount);
-
-  for (int i = 0; i < fieldCount; i++) free(fields[i]);
-}
-
-void printShow(const Show *show) {
-  printf("=> %s ## %s ## %s ## ", show->showId, show->title, show->type);
-
-  if (show->directorCount > 0) {
-    for (int i = 0; i < show->directorCount; i++) {
-      printf("%s%s", show->director[i], i < show->directorCount - 1 ? ", " : "");
-    }
-  } else {
-    printf("NaN");
-  }
-
-  printf(" ## [");
-  if (show->castCount > 0) {
-    for (int i = 0; i < show->castCount; i++) {
-      printf("%s%s", show->cast[i], i < show->castCount - 1 ? ", " : "");
-    }
-  } else {
-    printf("NaN");
-  }
-  printf("] ## %s ## %s ## %d ## %s ## %s ## ", show->country, show->dateAdded,
-         show->releaseYear, show->rating, show->duration);
-
-  if (show->listedInCount > 0) {
     printf("[");
-    for (int i = 0; i < show->listedInCount; i++) {
-      printf("%s%s", show->listedIn[i], i < show->listedInCount - 1 ? ", " : "");
+    for(int i=0;i<g->supportedLanguages.size;i++){
+        printf("%s",g->supportedLanguages.data[i]);
+        if(i<g->supportedLanguages.size-1) printf(", ");
     }
-    printf("]");
-  } else {
-    printf("NaN");
-  }
-  printf(" ##\n");
+    printf("] ## %d ## %.1f ## %d ## [%s] ## [%s] ## [",
+           g->metacriticScore, g->userScore, g->achievements, g->publisher, g->developers);
+
+    for(int i=0;i<g->categories.size;i++){
+        printf("%s",g->categories.data[i]);
+        if(i<g->categories.size-1) printf(", ");
+    }
+    printf("] ## [");
+    for(int i=0;i<g->genres.size;i++){
+        printf("%s",g->genres.data[i]);
+        if(i<g->genres.size-1) printf(", ");
+    }
+    printf("] ## [");
+    for(int i=0;i<g->tags.size;i++){
+        printf("%s",g->tags.data[i]);
+        if(i<g->tags.size-1) printf(", ");
+    }
+    printf("] ##\n");
 }
 
-void recursiveSelectionSort(Show *arr, int n, int index) {
-  if (index >= n - 1) return;
+void freeGames(Games *g) {
+    freeStringList(&g->supportedLanguages);
+    freeStringList(&g->categories);
+    freeStringList(&g->genres);
+    freeStringList(&g->tags);
+}
 
-  int min_index = index;
-  for (int i = index + 1; i < n; i++) {
-    if (strcmp(arr[i].title, arr[min_index].title) < 0) {
-      min_index = i;
+typedef struct Cel {
+    Games elemento;
+    struct Cel *prox;
+} Cel;
+
+typedef struct {
+    Cel *topo;
+    int size;
+} Pilha;
+
+void iniciarPilha(Pilha *p) {
+    p->topo = NULL;
+    p->size = 0;
+}
+
+void push(Pilha *p, Games x) {
+    Cel *tmp = malloc(sizeof(Cel));
+    tmp->elemento = x;
+    tmp->prox = p->topo;
+    p->topo = tmp;
+    p->size++;
+}
+
+Games pop(Pilha *p) {
+    Games vazio;
+    memset(&vazio, 0, sizeof(Games));
+
+    if (!p->topo) return vazio;
+
+    Cel *tmp = p->topo;
+    Games resp = tmp->elemento;
+    p->topo = tmp->prox;
+    free(tmp);
+    p->size--;
+    return resp;
+}
+
+void mostrarPilha(Pilha *p) {
+    Cel *i = p->topo;
+    int idx = 0;
+    while (i) {
+        printf("[%d] ", idx++);
+        imprimirGames(&i->elemento);
+        i = i->prox;
     }
-  }
+}
 
-  if (min_index != index) {
-    Show temp = arr[index];
-    arr[index] = arr[min_index];
-    arr[min_index] = temp;
-  }
+void liberarPilha(Pilha *p) {
+    while (p->topo) {
+        Games g = pop(p);
+        freeGames(&g);
+    }
+}
 
-  recursiveSelectionSort(arr, n, index + 1);
+Games *buscarPorID(Games *banco, int tam, const char *id) {
+    for(int i=0;i<tam;i++){
+        if(!strcmp(banco[i].appId,id)) return &banco[i];
+    }
+    return NULL;
 }
 
 int main() {
-  FILE *file = fopen("/tmp/disneyplus.csv", "r");
-  if (file == NULL) {
-    perror("Erro ao abrir o arquivo");
-    return 1;
-  }
 
-  char header[MAX_LINE_LENGTH];
-  if (fgets(header, MAX_LINE_LENGTH, file) == NULL) {
-    fclose(file);
-    printf("Arquivo vazio\n");
-    return 1;
-  }
-
-  Show *shows = NULL;
-  int showCount = 0;
-  char *line;
-
-  while ((line = readCompleteLine(file)) != NULL) {
-    Show show;
-    readShow(&show, line);
-    free(line);
-    shows = realloc(shows, (showCount + 1) * sizeof(Show));
-    shows[showCount++] = show;
-  }
-
-  fclose(file);
-
-  Show *selecionados = NULL;
-  int countSelecionados = 0;
-  char idBuscado[MAX_ID_LENGTH];
-
-  while (1) {
-    if (fgets(idBuscado, MAX_ID_LENGTH, stdin) == NULL) break;
-    idBuscado[strcspn(idBuscado, "\n")] = '\0';
-    if (strcmp(idBuscado, "FIM") == 0) break;
-
-    for (int i = 0; i < showCount; i++) {
-      if (strcmp(shows[i].showId, idBuscado) == 0) {
-        selecionados = realloc(selecionados, (countSelecionados + 1) * sizeof(Show));
-        selecionados[countSelecionados++] = shows[i];
-        break;
-      }
+    FILE *file = fopen("/tmp/games.csv","r");
+    if(!file){
+        printf("Erro ao abrir arquivo!\n");
+        return 1;
     }
-  }
 
-  recursiveSelectionSort(selecionados, countSelecionados, 0);
+    char header[10000];
+    fgets(header, sizeof(header), file);
 
-  for (int i = 0; i < countSelecionados; i++) {
-    printShow(&selecionados[i]);
-  }
+    Games *banco = malloc(10000*sizeof(Games));
+    int bancoSize = 0, cap = 10000;
 
-  for (int i = 0; i < showCount; i++) {
-    freeShow(&shows[i]);
-  }
+    char *linha;
+    while( (linha = lerLinhaCompleta(file)) != NULL ){
+        if(bancoSize >= cap){
+            cap *= 2;
+            banco = realloc(banco, cap*sizeof(Games));
+        }
+        lerGames(&banco[bancoSize], linha);
+        bancoSize++;
+        free(linha);
+    }
+    fclose(file);
 
-  free(shows);
-  free(selecionados);
+    Pilha pilha;
+    iniciarPilha(&pilha);
 
-  return 0;
+    char entrada[100];
+    while(1){
+        fgets(entrada, sizeof(entrada), stdin);
+        entrada[strcspn(entrada,"\n")] = 0;
+        if(!strcmp("FIM",entrada)) break;
+
+        Games *g = buscarPorID(banco, bancoSize, entrada);
+        if(g) push(&pilha, copyGames(g));
+    }
+
+    int n;
+    fgets(entrada,sizeof(entrada),stdin);
+    sscanf(entrada,"%d",&n);
+
+    for(int i=0;i<n;i++){
+        fgets(entrada,sizeof(entrada),stdin);
+        entrada[strcspn(entrada,"\n")] = 0;
+
+        char comando[10], param[100];
+        if(sscanf(entrada,"%s %s", comando, param) >= 1){
+            
+            if(!strcmp(comando,"I")){
+                Games *g = buscarPorID(banco, bancoSize, param);
+                if(g) push(&pilha, copyGames(g));
+
+            } else if(!strcmp(comando,"R")){
+                Games g = pop(&pilha);
+                printf("(R) %s\n", g.name);
+                freeGames(&g);
+            }
+        }
+    }
+
+    mostrarPilha(&pilha);
+    liberarPilha(&pilha);
+
+    for(int i=0;i<bancoSize;i++)
+        freeGames(&banco[i]);
+    free(banco);
+
+    return 0;
 }
