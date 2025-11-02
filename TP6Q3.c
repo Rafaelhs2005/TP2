@@ -26,18 +26,21 @@ void addToStringList(StringList *list, const char *str) {
 }
 
 void freeStringList(StringList *list) {
-    for (int i = 0; i < list->size; i++)
+    for (int i = 0; i < list->size; i++) {
         free(list->data[i]);
+    }
     free(list->data);
     list->data = NULL;
-    list->size = list->capacity = 0;
+    list->size = 0;
+    list->capacity = 0;
 }
 
 StringList copyStringList(const StringList *src) {
     StringList dst;
     initStringList(&dst);
-    for (int i = 0; i < src->size; i++)
+    for (int i = 0; i < src->size; i++) {
         addToStringList(&dst, src->data[i]);
+    }
     return dst;
 }
 
@@ -47,16 +50,12 @@ typedef struct {
     char releaseDate[50];
     char estimateOwners[100];
     float price;
-
     StringList supportedLanguages;
-
     int metacriticScore;
     float userScore;
     int achievements;
-
     char publisher[500];
     char developers[500];
-
     StringList categories;
     StringList genres;
     StringList tags;
@@ -64,44 +63,56 @@ typedef struct {
 
 Games copyGames(const Games *src) {
     Games dst = *src;
-
     dst.supportedLanguages = copyStringList(&src->supportedLanguages);
-    dst.categories        = copyStringList(&src->categories);
-    dst.genres            = copyStringList(&src->genres);
-    dst.tags              = copyStringList(&src->tags);
-
+    dst.categories = copyStringList(&src->categories);
+    dst.genres = copyStringList(&src->genres);
+    dst.tags = copyStringList(&src->tags);
     return dst;
 }
 
-int contarAspas(const char *s){
-    int c = 0;
-    while(*s) if(*s++ == '"') c++;
-    return c;
+void freeGames(Games *g) {
+    freeStringList(&g->supportedLanguages);
+    freeStringList(&g->categories);
+    freeStringList(&g->genres);
+    freeStringList(&g->tags);
+}
+
+int contarAspas(const char *linha) {
+    int count = 0;
+    for (int i = 0; linha[i]; i++) {
+        if (linha[i] == '"') count++;
+    }
+    return count;
 }
 
 char *lerLinhaCompleta(FILE *file) {
     char buffer[10000];
     char *result = NULL;
-    size_t total = 0;
+    size_t totalLength = 0;
     int aspas = 0;
 
     while (fgets(buffer, sizeof(buffer), file)) {
         int len = strlen(buffer);
         aspas += contarAspas(buffer);
 
-        result = realloc(result, total + len + 1);
-        if (!result) return NULL;
+        char *newResult = realloc(result, totalLength + len + 1);
+        if (!newResult) {
+            free(result);
+            return NULL;
+        }
+        result = newResult;
 
-        if (total == 0)
+        if (totalLength == 0) {
             strcpy(result, buffer);
-        else
+        } else {
             strcat(result, buffer);
-
-        total += len;
+        }
+        totalLength += len;
 
         if (aspas % 2 == 0)
             break;
     }
+
     return result;
 }
 
@@ -116,54 +127,55 @@ StringList splitCSV(const char *linha) {
     char *start = buffer;
 
     for (char *p = buffer; *p; p++) {
-        if (*p == '"')
+        if (*p == '"') {
             aspas = !aspas;
-        else if (*p == ',' && !aspas) {
+        } else if (*p == ',' && !aspas) {
             *p = '\0';
-            addToStringList(&campos, strlen(start) ? start : "NaN");
+            if (strlen(start) == 0) addToStringList(&campos, "NaN");
+            else addToStringList(&campos, start);
             start = p + 1;
         }
     }
-    addToStringList(&campos, strlen(start) ? start : "NaN");
+    if (strlen(start) == 0) addToStringList(&campos, "NaN");
+    else addToStringList(&campos, start);
 
     free(buffer);
     return campos;
 }
 
 const char *getField(const StringList *campos, int idx) {
-    if (!campos || idx < 0 || idx >= campos->size)
-        return "NaN";
-    return strlen(campos->data[idx]) ? campos->data[idx] : "NaN";
+    if (campos == NULL || idx < 0 || idx >= campos->size) return "NaN";
+    const char *field = campos->data[idx];
+    if (field == NULL || strlen(field) == 0) return "NaN";
+    return field;
 }
 
 StringList parseListField(const char *s) {
     StringList result;
     initStringList(&result);
-
-    if (!s || strcmp(s, "NaN") == 0)
-        return result;
+    if (s == NULL || strcmp(s, "NaN") == 0) return result;
 
     char *temp = malloc(strlen(s) + 1);
     strcpy(temp, s);
 
     char *start = temp;
     char *end = temp + strlen(temp) - 1;
-
     if (*start == '[' && *end == ']') {
         *end = '\0';
         start++;
     }
 
-    for (char *p = start; *p; p++)
-        if (*p == '\'') *p = ' ';
+    for (char *p = start; *p; p++) if (*p == '\'') *p = ' ';
 
     char *token = strtok(start, ",");
-    while (token) {
-        while (isspace((unsigned char)*token)) token++;
-        char *e = token + strlen(token) - 1;
-        while (e > token && isspace((unsigned char)*e)) *e-- = '\0';
-        if (strlen(token))
-            addToStringList(&result, token);
+    while (token != NULL) {
+        while (*token && isspace((unsigned char)*token)) token++;
+        char *end = token + strlen(token) - 1;
+        while (end > token && isspace((unsigned char)*end)) {
+            *end = '\0';
+            end--;
+        }
+        if (strlen(token) > 0) addToStringList(&result, token);
         token = strtok(NULL, ",");
     }
 
@@ -173,29 +185,38 @@ StringList parseListField(const char *s) {
 
 static const char* month_to_num(const char *m3){
     if(!m3) return "00";
-    if(!strncasecmp(m3,"Jan",3)) return "01";
-    if(!strncasecmp(m3,"Feb",3)) return "02";
-    if(!strncasecmp(m3,"Mar",3)) return "03";
-    if(!strncasecmp(m3,"Apr",3)) return "04";
-    if(!strncasecmp(m3,"May",3)) return "05";
-    if(!strncasecmp(m3,"Jun",3)) return "06";
-    if(!strncasecmp(m3,"Jul",3)) return "07";
-    if(!strncasecmp(m3,"Aug",3)) return "08";
-    if(!strncasecmp(m3,"Sep",3)) return "09";
-    if(!strncasecmp(m3,"Oct",3)) return "10";
-    if(!strncasecmp(m3,"Nov",3)) return "11";
-    if(!strncasecmp(m3,"Dec",3)) return "12";
+    if(strncasecmp(m3,"Jan",3)==0) return "01";
+    if(strncasecmp(m3,"Feb",3)==0) return "02";
+    if(strncasecmp(m3,"Mar",3)==0) return "03";
+    if(strncasecmp(m3,"Apr",3)==0) return "04";
+    if(strncasecmp(m3,"May",3)==0) return "05";
+    if(strncasecmp(m3,"Jun",3)==0) return "06";
+    if(strncasecmp(m3,"Jul",3)==0) return "07";
+    if(strncasecmp(m3,"Aug",3)==0) return "08";
+    if(strncasecmp(m3,"Sep",3)==0) return "09";
+    if(strncasecmp(m3,"Oct",3)==0) return "10";
+    if(strncasecmp(m3,"Nov",3)==0) return "11";
+    if(strncasecmp(m3,"Dec",3)==0) return "12";
     return "00";
 }
 
 static void format_date(char *dest, const char *orig){
-    char m3[8]={0}; 
+    char clean[64]={0};
+    int j=0;
+
+    for(int i=0; orig[i] && j<63; i++){
+        if(orig[i] != '"' && orig[i] != '\'')
+            clean[j++] = orig[i];
+    }
+    clean[j] = '\0';
+
+    char m3[8]={0};
     int day=0, year=0;
 
-    if(sscanf(orig,"%3s %d, %d",m3,&day,&year) == 3){
-        snprintf(dest,32,"%02d/%s/%d",day,month_to_num(m3),year);
+    if(sscanf(clean, "%3s %d, %d", m3, &day, &year) == 3){
+        snprintf(dest, 32, "%02d/%s/%d", day, month_to_num(m3), year);
     } else {
-        strncpy(dest, orig, 31);
+        strncpy(dest, clean, 31);
         dest[31]='\0';
     }
 }
@@ -203,158 +224,178 @@ static void format_date(char *dest, const char *orig){
 void lerGames(Games *g, const char *linha) {
     StringList campos = splitCSV(linha);
 
-    strncpy(g->appId, getField(&campos,0), sizeof(g->appId)-1);
+    strncpy(g->appId, getField(&campos, 0), sizeof(g->appId)-1);
     g->appId[sizeof(g->appId)-1] = '\0';
 
-    strncpy(g->name, getField(&campos,1), sizeof(g->name)-1);
+    strncpy(g->name, getField(&campos, 1), sizeof(g->name)-1);
     g->name[sizeof(g->name)-1] = '\0';
 
-    char raw[50];
-    strncpy(raw, getField(&campos,2), sizeof(raw)-1);
-    raw[sizeof(raw)-1]='\0';
-    format_date(g->releaseDate, raw);
+    char rawDate[50];
+    strncpy(rawDate, getField(&campos, 2), sizeof(rawDate)-1);
+    rawDate[sizeof(rawDate)-1] = '\0';
+    format_date(g->releaseDate, rawDate);
 
-    strncpy(g->estimateOwners, getField(&campos,3),sizeof(g->estimateOwners)-1);
-    g->estimateOwners[sizeof(g->estimateOwners)-1]='\0';
+    strncpy(g->estimateOwners, getField(&campos, 3), sizeof(g->estimateOwners)-1);
+    g->estimateOwners[sizeof(g->estimateOwners)-1] = '\0';
 
-    const char *pr = getField(&campos,4);
-    g->price = strcmp(pr,"NaN") ? atof(pr) : 0.0f;
+    const char *priceStr = getField(&campos, 4);
+    g->price = strcmp(priceStr, "NaN")==0 ? 0.0f : atof(priceStr);
 
-    g->supportedLanguages = parseListField(getField(&campos,5));
-    g->metacriticScore = strcmp(getField(&campos,6),"NaN") ? atoi(getField(&campos,6)) : 0;
-    g->userScore       = strcmp(getField(&campos,7),"NaN") ? atof(getField(&campos,7)) : 0;
-    g->achievements    = strcmp(getField(&campos,8),"NaN") ? atoi(getField(&campos,8)) : 0;
+    g->supportedLanguages = parseListField(getField(&campos, 5));
+    g->metacriticScore = strcmp(getField(&campos, 6),"NaN")==0 ? 0 : atoi(getField(&campos,6));
+    g->userScore = strcmp(getField(&campos,7),"NaN")==0 ? 0.0f : atof(getField(&campos,7));
+    g->achievements = strcmp(getField(&campos,8),"NaN")==0 ? 0 : atoi(getField(&campos,8));
 
-    strncpy(g->publisher,  getField(&campos,9),  sizeof(g->publisher)-1);
-    strncpy(g->developers, getField(&campos,10), sizeof(g->developers)-1);
+    strncpy(g->publisher,getField(&campos,9),sizeof(g->publisher)-1);
+    g->publisher[sizeof(g->publisher)-1]='\0';
+
+    strncpy(g->developers,getField(&campos,10),sizeof(g->developers)-1);
+    g->developers[sizeof(g->developers)-1]='\0';
 
     g->categories = parseListField(getField(&campos,11));
-    g->genres     = parseListField(getField(&campos,12));
-    g->tags       = parseListField(getField(&campos,13));
+    g->genres = parseListField(getField(&campos,12));
+    g->tags = parseListField(getField(&campos,13));
 
-    for(int i=0;i<campos.size;i++)
-        free(campos.data[i]);
+    for(int i=0;i<campos.size;i++) free(campos.data[i]);
     free(campos.data);
 }
 
 void imprimirGames(const Games *g) {
-    printf("=> %s ## %s ## %s ## %s ## %.2f ## ",
-           g->appId, g->name, g->releaseDate, g->estimateOwners, g->price);
+    printf("%s ## %s ## %s ## ", g->appId, g->name, g->releaseDate);
+    printf("%s ## %.2f ## ", g->estimateOwners, g->price);
 
-    printf("[");
     for(int i=0;i<g->supportedLanguages.size;i++){
         printf("%s",g->supportedLanguages.data[i]);
         if(i<g->supportedLanguages.size-1) printf(", ");
     }
-    printf("] ## %d ## %.1f ## %d ## [%s] ## [%s] ## [",
-           g->metacriticScore, g->userScore, g->achievements, g->publisher, g->developers);
+    printf(" ## ");
+
+    printf("%d ## %.1f ## %d ## [%s] ## [%s] ## [", g->metacriticScore, g->userScore,
+           g->achievements, g->publisher, g->developers);
 
     for(int i=0;i<g->categories.size;i++){
         printf("%s",g->categories.data[i]);
         if(i<g->categories.size-1) printf(", ");
     }
     printf("] ## [");
+
     for(int i=0;i<g->genres.size;i++){
         printf("%s",g->genres.data[i]);
         if(i<g->genres.size-1) printf(", ");
     }
     printf("] ## [");
+
     for(int i=0;i<g->tags.size;i++){
         printf("%s",g->tags.data[i]);
         if(i<g->tags.size-1) printf(", ");
     }
-    printf("] ##\n");
+    printf("]\n");
 }
 
-void freeGames(Games *g) {
-    freeStringList(&g->supportedLanguages);
-    freeStringList(&g->categories);
-    freeStringList(&g->genres);
-    freeStringList(&g->tags);
-}
-
-typedef struct Cel {
+typedef struct Celula {
     Games elemento;
-    struct Cel *prox;
-} Cel;
+    struct Celula *prox;
+} Celula;
 
 typedef struct {
-    Cel *topo;
-    int size;
+    Celula *topo;
 } Pilha;
 
 void iniciarPilha(Pilha *p) {
     p->topo = NULL;
-    p->size = 0;
 }
 
 void push(Pilha *p, Games x) {
-    Cel *tmp = malloc(sizeof(Cel));
+    Celula *tmp = malloc(sizeof(Celula));
     tmp->elemento = x;
     tmp->prox = p->topo;
     p->topo = tmp;
-    p->size++;
 }
 
 Games pop(Pilha *p) {
-    Games vazio;
-    memset(&vazio, 0, sizeof(Games));
-
-    if (!p->topo) return vazio;
-
-    Cel *tmp = p->topo;
+    if(p->topo == NULL){
+        Games vazio;
+        memset(&vazio,0,sizeof(Games));
+        return vazio;
+    }
+    Celula *tmp = p->topo;
     Games resp = tmp->elemento;
     p->topo = tmp->prox;
     free(tmp);
-    p->size--;
     return resp;
 }
 
-void mostrarPilha(Pilha *p) {
-    Cel *i = p->topo;
-    int idx = 0;
-    while (i) {
-        printf("[%d] ", idx++);
-        imprimirGames(&i->elemento);
+void mostrarPilha(Pilha *p){
+
+    int count = 0;
+    Celula *i = p->topo;
+    while(i != NULL){
+        count++;
         i = i->prox;
     }
+
+    Games *temp = malloc(count * sizeof(Games));
+
+    i = p->topo;
+    for(int j = count - 1; j >= 0; j--){
+        temp[j] = copyGames(&i->elemento);
+        i = i->prox;
+    }
+
+    for(int j = 0; j < count; j++){
+        printf("[%d] => ", j);
+        imprimirGames(&temp[j]);
+        freeGames(&temp[j]);
+    }
+
+    free(temp);
 }
 
-void liberarPilha(Pilha *p) {
-    while (p->topo) {
-        Games g = pop(p);
-        freeGames(&g);
+void liberarPilha(Pilha *p){
+    while(p->topo != NULL){
+        Celula *tmp = p->topo;
+        p->topo = tmp->prox;
+        freeGames(&tmp->elemento);
+        free(tmp);
     }
 }
 
-Games *buscarPorID(Games *banco, int tam, const char *id) {
-    for(int i=0;i<tam;i++){
-        if(!strcmp(banco[i].appId,id)) return &banco[i];
+Games *buscarPorID(Games *banco,int bancoSize,const char *id){
+    for(int i=0;i<bancoSize;i++){
+        if(strcmp(banco[i].appId,id)==0) return &banco[i];
     }
     return NULL;
 }
 
-int main() {
+void trimString(char *str) {
+    if(str == NULL) return;
+    
+    char *end;
+    
+    while(isspace((unsigned char)*str)) str++;
+    
+    end = str + strlen(str) - 1;
+    while(end > str && isspace((unsigned char)*end)) end--;
+    *(end + 1) = '\0';
+}
 
-    FILE *file = fopen("/tmp/games.csv","r");
-    if(!file){
-        printf("Erro ao abrir arquivo!\n");
-        return 1;
-    }
+int main(){
+    FILE *file=fopen("/tmp/games.csv","r");
+    if(!file){ printf("Erro ao abrir arquivo!\n"); return 1; }
 
     char header[10000];
-    fgets(header, sizeof(header), file);
+    fgets(header,sizeof(header),file);
 
-    Games *banco = malloc(10000*sizeof(Games));
-    int bancoSize = 0, cap = 10000;
+    Games *banco=malloc(10000*sizeof(Games));
+    int bancoSize=0, bancoCapacity=10000;
 
     char *linha;
-    while( (linha = lerLinhaCompleta(file)) != NULL ){
-        if(bancoSize >= cap){
-            cap *= 2;
-            banco = realloc(banco, cap*sizeof(Games));
+    while((linha=lerLinhaCompleta(file))!=NULL){
+        if(bancoSize>=bancoCapacity){
+            bancoCapacity*=2; 
+            banco=realloc(banco,bancoCapacity*sizeof(Games));
         }
-        lerGames(&banco[bancoSize], linha);
+        lerGames(&banco[bancoSize],linha);
         bancoSize++;
         free(linha);
     }
@@ -365,12 +406,12 @@ int main() {
 
     char entrada[100];
     while(1){
-        fgets(entrada, sizeof(entrada), stdin);
-        entrada[strcspn(entrada,"\n")] = 0;
-        if(!strcmp("FIM",entrada)) break;
+        fgets(entrada,sizeof(entrada),stdin);
+        entrada[strcspn(entrada,"\n")]=0;
+        if(strcmp(entrada,"FIM")==0) break;
 
-        Games *g = buscarPorID(banco, bancoSize, entrada);
-        if(g) push(&pilha, copyGames(g));
+        Games *g=buscarPorID(banco,bancoSize,entrada);
+        if(g!=NULL) push(&pilha,copyGames(g));
     }
 
     int n;
@@ -379,28 +420,35 @@ int main() {
 
     for(int i=0;i<n;i++){
         fgets(entrada,sizeof(entrada),stdin);
-        entrada[strcspn(entrada,"\n")] = 0;
+        entrada[strcspn(entrada,"\n")]=0;
+        
+        trimString(entrada);
+        
+        if(strlen(entrada) == 0) continue;
 
-        char comando[10], param[100];
-        if(sscanf(entrada,"%s %s", comando, param) >= 1){
+        if(entrada[0]=='I'){
+            char id[100];
+
+            char *id_start = entrada + 1;
+            while(*id_start && isspace((unsigned char)*id_start)) id_start++;
             
-            if(!strcmp(comando,"I")){
-                Games *g = buscarPorID(banco, bancoSize, param);
-                if(g) push(&pilha, copyGames(g));
+            strcpy(id, id_start);
+            trimString(id); 
+            
+            Games *g=buscarPorID(banco,bancoSize,id);
+            if(g!=NULL) push(&pilha,copyGames(g));
 
-            } else if(!strcmp(comando,"R")){
-                Games g = pop(&pilha);
-                printf("(R) %s\n", g.name);
-                freeGames(&g);
-            }
+        } else if(strcmp(entrada,"R")==0){
+            Games g=pop(&pilha);
+            printf("(R) %s\n",g.name);
+            freeGames(&g);
         }
     }
 
     mostrarPilha(&pilha);
     liberarPilha(&pilha);
 
-    for(int i=0;i<bancoSize;i++)
-        freeGames(&banco[i]);
+    for(int i=0;i<bancoSize;i++) freeGames(&banco[i]);
     free(banco);
 
     return 0;

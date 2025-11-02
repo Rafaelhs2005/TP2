@@ -3,43 +3,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-// --- ESTRUTURAS ---
-
 typedef struct {
     char **data;
     int size;
     int capacity;
 } StringList;
-
-typedef struct {
-    char appId[100];
-    char name[500];
-    char releaseDate[50];
-    char estimateOwners[100];
-    float price;
-    StringList supportedLanguages;
-    int metacriticScore;
-    float userScore;
-    int achievements;
-    char publisher[500];
-    char developers[500];
-    StringList categories;
-    StringList genres;
-    StringList tags;
-} Games;
-
-typedef struct Celula {
-    Games elemento;
-    struct Celula *prox;
-} Celula;
-
-typedef struct {
-    Celula *primeiro;
-    Celula *ultimo;
-    int tamanho;
-} Lista;
-
-// --- STRINGLIST AUX ---
 
 void initStringList(StringList *list) {
     list->data = NULL;
@@ -76,7 +44,22 @@ StringList copyStringList(const StringList *src) {
     return dst;
 }
 
-// --- GAMES AUX ---
+typedef struct {
+    char appId[100];
+    char name[500];
+    char releaseDate[50];
+    char estimateOwners[100];
+    float price;
+    StringList supportedLanguages;
+    int metacriticScore;
+    float userScore;
+    int achievements;
+    char publisher[500];
+    char developers[500];
+    StringList categories;
+    StringList genres;
+    StringList tags;
+} Games;
 
 Games copyGames(const Games *src) {
     Games dst = *src;
@@ -87,7 +70,12 @@ Games copyGames(const Games *src) {
     return dst;
 }
 
-// --- FUNÇÕES CSV ---
+void freeGames(Games *g) {
+    freeStringList(&g->supportedLanguages);
+    freeStringList(&g->categories);
+    freeStringList(&g->genres);
+    freeStringList(&g->tags);
+}
 
 int contarAspas(const char *linha) {
     int count = 0;
@@ -195,8 +183,6 @@ StringList parseListField(const char *s) {
     return result;
 }
 
-// --- FORMATAR DATA ---
-
 static const char* month_to_num(const char *m3){
     if(!m3) return "00";
     if(strncasecmp(m3,"Jan",3)==0) return "01";
@@ -215,15 +201,25 @@ static const char* month_to_num(const char *m3){
 }
 
 static void format_date(char *dest, const char *orig){
-    char m3[8]={0}; int day=0, year=0;
-    if(sscanf(orig,"%3s %d, %d",m3,&day,&year)==3){
-        snprintf(dest,32,"%02d/%s/%d",day,month_to_num(m3),year);
+    char clean[64]={0};
+    int j=0;
+
+    for(int i=0; orig[i] && j<63; i++){
+        if(orig[i] != '"' && orig[i] != '\'')
+            clean[j++] = orig[i];
+    }
+    clean[j] = '\0';
+
+    char m3[8]={0};
+    int day=0, year=0;
+
+    if(sscanf(clean, "%3s %d, %d", m3, &day, &year) == 3){
+        snprintf(dest, 32, "%02d/%s/%d", day, month_to_num(m3), year);
     } else {
-        strncpy(dest,orig,31); dest[31]='\0';
+        strncpy(dest, clean, 31);
+        dest[31]='\0';
     }
 }
-
-// --- FUNÇÕES GAMES ---
 
 void lerGames(Games *g, const char *linha) {
     StringList campos = splitCSV(linha);
@@ -265,14 +261,14 @@ void lerGames(Games *g, const char *linha) {
 }
 
 void imprimirGames(const Games *g) {
-    printf("=> %s ## %s ## %s ## ", g->appId, g->name, g->releaseDate);
-    printf("%s ## %.2f ## [", g->estimateOwners, g->price);
+    printf("%s ## %s ## %s ## ", g->appId, g->name, g->releaseDate);
+    printf("%s ## %.2f ## ", g->estimateOwners, g->price);
 
     for(int i=0;i<g->supportedLanguages.size;i++){
         printf("%s",g->supportedLanguages.data[i]);
         if(i<g->supportedLanguages.size-1) printf(", ");
     }
-    printf("] ## ");
+    printf(" ## ");
 
     printf("%d ## %.1f ## %d ## [%s] ## [%s] ## [", g->metacriticScore, g->userScore,
            g->achievements, g->publisher, g->developers);
@@ -293,116 +289,60 @@ void imprimirGames(const Games *g) {
         printf("%s",g->tags.data[i]);
         if(i<g->tags.size-1) printf(", ");
     }
-    printf("] ##\n");
+    printf("]\n");
 }
 
-void freeGames(Games *g) {
-    freeStringList(&g->supportedLanguages);
-    freeStringList(&g->categories);
-    freeStringList(&g->genres);
-    freeStringList(&g->tags);
+typedef struct Celula {
+    Games elemento;
+    struct Celula *prox;
+} Celula;
+
+typedef struct {
+    Celula *topo;
+} Pilha;
+
+void iniciarPilha(Pilha *p) {
+    p->topo = NULL;
 }
 
-// --- LISTA ENCADEADA ---
-
-void iniciarLista(Lista *lista) {
-    lista->primeiro = NULL;
-    lista->ultimo = NULL;
-    lista->tamanho = 0;
-}
-
-void inserirInicio(Lista *lista, Games x) {
+void push(Pilha *p, Games x) {
     Celula *tmp = malloc(sizeof(Celula));
     tmp->elemento = x;
-    tmp->prox = lista->primeiro;
-    lista->primeiro = tmp;
-    if(lista->ultimo==NULL) lista->ultimo = tmp;
-    lista->tamanho++;
+    tmp->prox = p->topo;
+    p->topo = tmp;
 }
 
-void inserirFim(Lista *lista, Games x) {
-    Celula *tmp = malloc(sizeof(Celula));
-    tmp->elemento = x;
-    tmp->prox = NULL;
-    if(lista->ultimo==NULL){
-        lista->primeiro=tmp; lista->ultimo=tmp;
-    } else {
-        lista->ultimo->prox=tmp; lista->ultimo=tmp;
+Games pop(Pilha *p) {
+    if(p->topo == NULL){
+        Games vazio;
+        memset(&vazio,0,sizeof(Games));
+        return vazio;
     }
-    lista->tamanho++;
-}
-
-void inserir(Lista *lista, Games x, int pos) {
-    if(pos<0 || pos>lista->tamanho){ printf("Posição inválida!\n"); return; }
-    if(pos==0){ inserirInicio(lista,x); return; }
-    if(pos==lista->tamanho){ inserirFim(lista,x); return; }
-
-    Celula *i=lista->primeiro;
-    for(int j=0;j<pos-1;j++) i=i->prox;
-
-    Celula *tmp=malloc(sizeof(Celula));
-    tmp->elemento=x; tmp->prox=i->prox; i->prox=tmp;
-    lista->tamanho++;
-}
-
-Games removerInicio(Lista *lista) {
-    if(lista->primeiro==NULL){ Games vazio; memset(&vazio,0,sizeof(Games)); return vazio; }
-    Celula *tmp=lista->primeiro;
-    Games resp=tmp->elemento;
-    lista->primeiro=tmp->prox;
-    if(lista->primeiro==NULL) lista->ultimo=NULL;
-    free(tmp); lista->tamanho--;
+    Celula *tmp = p->topo;
+    Games resp = tmp->elemento;
+    p->topo = tmp->prox;
+    free(tmp);
     return resp;
 }
 
-Games removerFim(Lista *lista) {
-    if(lista->primeiro==NULL){ Games vazio; memset(&vazio,0,sizeof(Games)); return vazio; }
-    if(lista->primeiro==lista->ultimo){
-        Games resp=lista->primeiro->elemento;
-        free(lista->primeiro); lista->primeiro=lista->ultimo=NULL; lista->tamanho--;
-        return resp;
-    }
-    Celula *i=lista->primeiro;
-    while(i->prox!=lista->ultimo) i=i->prox;
-    Games resp=lista->ultimo->elemento;
-    free(lista->ultimo); lista->ultimo=i; i->prox=NULL; lista->tamanho--;
-    return resp;
-}
-
-Games remover(Lista *lista,int pos){
-    if(pos<0 || pos>=lista->tamanho){ Games vazio; memset(&vazio,0,sizeof(Games)); return vazio; }
-    if(pos==0) return removerInicio(lista);
-    if(pos==lista->tamanho-1) return removerFim(lista);
-
-    Celula *i=lista->primeiro;
-    for(int j=0;j<pos-1;j++) i=i->prox;
-    Celula *tmp=i->prox;
-    Games resp=tmp->elemento;
-    i->prox=tmp->prox; free(tmp); lista->tamanho--;
-    return resp;
-}
-
-void mostrarLista(Lista *lista){
-    Celula *i=lista->primeiro; int cont=0;
-    while(i!=NULL){
-        printf("[%d] ", cont++);
+void mostrarPilha(Pilha *p){
+    Celula *i = p->topo;
+    int idx = 0;
+    while(i != NULL){
+        printf("[%d] ", idx++);
         imprimirGames(&i->elemento);
-        i=i->prox;
+        i = i->prox;
     }
 }
 
-void liberarLista(Lista *lista){
-    Celula *atual=lista->primeiro;
-    while(atual!=NULL){
-        Celula *prox=atual->prox;
-        freeGames(&atual->elemento);
-        free(atual);
-        atual=prox;
+void liberarPilha(Pilha *p){
+    while(p->topo != NULL){
+        Celula *tmp = p->topo;
+        p->topo = tmp->prox;
+        freeGames(&tmp->elemento);
+        free(tmp);
     }
-    lista->primeiro=lista->ultimo=NULL; lista->tamanho=0;
 }
-
-// --- BUSCA ---
 
 Games *buscarPorID(Games *banco,int bancoSize,const char *id){
     for(int i=0;i<bancoSize;i++){
@@ -410,8 +350,6 @@ Games *buscarPorID(Games *banco,int bancoSize,const char *id){
     }
     return NULL;
 }
-
-// --- MAIN ---
 
 int main(){
     FILE *file=fopen("/tmp/games.csv","r");
@@ -425,15 +363,18 @@ int main(){
 
     char *linha;
     while((linha=lerLinhaCompleta(file))!=NULL){
-        if(bancoSize>=bancoCapacity){ bancoCapacity*=2; banco=realloc(banco,bancoCapacity*sizeof(Games)); }
+        if(bancoSize>=bancoCapacity){
+            bancoCapacity*=2; 
+            banco=realloc(banco,bancoCapacity*sizeof(Games));
+        }
         lerGames(&banco[bancoSize],linha);
         bancoSize++;
         free(linha);
     }
     fclose(file);
 
-    Lista lista;
-    iniciarLista(&lista);
+    Pilha pilha;
+    iniciarPilha(&pilha);
 
     char entrada[100];
     while(1){
@@ -442,7 +383,7 @@ int main(){
         if(strcmp(entrada,"FIM")==0) break;
 
         Games *g=buscarPorID(banco,bancoSize,entrada);
-        if(g!=NULL) inserirFim(&lista,copyGames(g));
+        if(g!=NULL) push(&pilha,copyGames(g));
     }
 
     int n;
@@ -453,37 +394,21 @@ int main(){
         fgets(entrada,sizeof(entrada),stdin);
         entrada[strcspn(entrada,"\n")]=0;
 
-        char comando[10], param1[100], param2[100];
-        if(sscanf(entrada,"%s %s %s",comando,param1,param2)>=1){
-            if(strcmp(comando,"II")==0){
-                Games *g=buscarPorID(banco,bancoSize,param1);
-                if(g!=NULL) inserirInicio(&lista,copyGames(g));
-            } else if(strcmp(comando,"IF")==0){
-                Games *g=buscarPorID(banco,bancoSize,param1);
-                if(g!=NULL) inserirFim(&lista,copyGames(g));
-            } else if(strcmp(comando,"I*")==0){
-                int pos=atoi(param1);
-                Games *g=buscarPorID(banco,bancoSize,param2);
-                if(g!=NULL) inserir(&lista,copyGames(g),pos);
-            } else if(strcmp(comando,"RI")==0){
-                Games g=removerInicio(&lista);
-                printf("(R) %s\n",g.name);
-                freeGames(&g);
-            } else if(strcmp(comando,"RF")==0){
-                Games g=removerFim(&lista);
-                printf("(R) %s\n",g.name);
-                freeGames(&g);
-            } else if(strcmp(comando,"R*")==0){
-                int pos=atoi(param1);
-                Games g=remover(&lista,pos);
-                printf("(R) %s\n",g.name);
-                freeGames(&g);
-            }
+        if(entrada[0]=='I'){
+            char id[100];
+            sscanf(entrada,"I %s",id);
+            Games *g=buscarPorID(banco,bancoSize,id);
+            if(g!=NULL) push(&pilha,copyGames(g));
+
+        } else if(strcmp(entrada,"R")==0){
+            Games g=pop(&pilha);
+            printf("(R) %s\n",g.name);
+            freeGames(&g);
         }
     }
 
-    mostrarLista(&lista);
-    liberarLista(&lista);
+    mostrarPilha(&pilha);
+    liberarPilha(&pilha);
 
     for(int i=0;i<bancoSize;i++) freeGames(&banco[i]);
     free(banco);
